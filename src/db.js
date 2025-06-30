@@ -1,4 +1,4 @@
-const mysql = require('mysql2/promise');
+/*const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 // Configuración de la base de datos (Usando conexión pool para mejor rendimiento)
@@ -12,12 +12,15 @@ const db = mysql.createPool({
     queueLimit: 0,
 	 uri: process.env.DATABASE_URL	
 });
-module.exports = db;
-/*const mysql = require('mysql2/promise');
+module.exports = db;*/
+const mysql = require('mysql2/promise');
 require('dotenv').config();
 
 const db = mysql.createPool({
-  uri: process.env.DATABASE_URL
+  uri: process.env.DATABASE_URL, // ✅ Usa la URI completa generada por Railway
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
-module.exports = db;*/
+module.exports = db;
