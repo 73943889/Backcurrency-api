@@ -16,14 +16,8 @@ const transferRoutes = require('./src/routes/transferRoutes');
 const changePassword= require('./src/routes/passwordchangesRoutes');
 const forgotPassword = require('./src/routes/forgotPasswordRoutes');
 
-const pingDbRoute = require('./src/routes/pingDbRoute');
-const app = express();
 
-console.log('🌐 ENV:', {
-  DB_HOST: process.env.DB_HOST,
-  DB_USER: process.env.DB_USER,
-  DB_NAME: process.env.DB_NAME
-});
+const app = express();
 
 app.use(cors({
   origin: '*', // Solo para pruebas. En prod puedes poner: 'https://fluffy-salamander-44d47c.netlify.app'
@@ -43,7 +37,6 @@ app.use('/api', cambioEuroRoutes);
 app.use('/api/convert', convertRoutes);
 app.use('/api/reset-password', changePassword);
 app.use('/api/forgot-password', forgotPassword);
-app.use('/api', pingDbRoute);
 const PORT = process.env.PORT || 5037;
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);
