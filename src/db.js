@@ -13,11 +13,14 @@ const db = mysql.createPool({
 	 uri: process.env.DATABASE_URL	
 });
 module.exports = db;*/
-const mysql = require('mysql2/promise');
 require('dotenv').config();
+const mysql = require('mysql2/promise');
+
+if (!process.env.MYSQL_URL) {
+  throw new Error("❌ MYSQL_URL no está definida en process.env");
+}
 
 const url = new URL(process.env.MYSQL_URL);
-
 const db = mysql.createPool({
   host: url.hostname,
   user: url.username,
