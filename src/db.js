@@ -16,20 +16,31 @@ module.exports = db;*/
 require('dotenv').config();
 const mysql = require('mysql2/promise');
 
-if (!process.env.MYSQL_URL) {
-  throw new Error("❌ MYSQL_URL no está definida en process.env");
-}
+let db;
 
-const url = new URL(process.env.MYSQL_URL);
-const db = mysql.createPool({
-  host: url.hostname,
-  user: url.username,
-  password: url.password,
-  database: url.pathname.replace('/', ''),
-  port: Number(url.port),
-  waitForConnections: true,
-  connectionLimit: 10,
-  queueLimit: 0
-});
+if (process.env.MYSQL_URL) {
+  const url = new URL(process.env.MYSQL_URL);
+  db = mysql.createPool({
+    host: url.hostname,
+    user: url.username,
+    password: url.password,
+    database: url.pathname.replace('/', ''),
+    port: Number(url.port),
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  });
+} else {
+  db = mysql.createPool({
+    host: process.env.DB_HOST || 'localhost',
+    user: process.env.DB_USER || 'root',
+    password: process.env.DB_PASSWORD || '',
+    database: process.env.DB_NAME || '',
+    port: process.env.DB_PORT || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0
+  });
+}
 
 module.exports = db;
