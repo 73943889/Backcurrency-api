@@ -16,8 +16,14 @@ module.exports = db;*/
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
+const url = new URL(process.env.MYSQL_URL);
+
 const db = mysql.createPool({
-  uri: process.env.DATABASE_URL, // ✅ Usa la URI completa generada por Railway
+  host: url.hostname,
+  user: url.username,
+  password: url.password,
+  database: url.pathname.replace('/', ''),
+  port: Number(url.port),
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
