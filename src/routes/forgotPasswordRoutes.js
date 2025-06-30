@@ -83,7 +83,7 @@ router.post('/', async (req, res) => {
     await pool.query('INSERT INTO password_resets (email, token) VALUES (?, ?)', [email, token]);
 
     // Enlaces para el correo
-   const resetLinkWeb = `https://fluffy-salamander-44d47c.netlify.app/reset-password?token=${token}`; // opcional si tienes frontend web
+   const resetLinkWeb = `https://backcurrency-api-production.up.railway.app/api/reset-password?token=${token}`; // opcional si tienes frontend web
    const resetDeepLink = `https://fluffy-salamander-44d47c.netlify.app/reset-password?token=${token}`;    // enlace hacia Android app
 
     // Configura el transporte de nodemailer
