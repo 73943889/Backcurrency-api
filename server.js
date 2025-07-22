@@ -15,8 +15,9 @@ const convertRoutes = require('./src/routes/convert');
 const transferRoutes = require('./src/routes/transferRoutes');
 const changePassword= require('./src/routes/passwordchangesRoutes');
 const forgotPassword = require('./src/routes/forgotPasswordRoutes');
-
-
+const lastMovement = require('./src/routes/LastTransfersRoutes');
+const validateCuponRoute = require('./src/routes/validateCuponRoutes');
+const cuponRoutes = require('./src/routes/cuponRoutes');
 const app = express();
 
 app.use(cors({
@@ -37,6 +38,9 @@ app.use('/api', cambioEuroRoutes);
 app.use('/api/convert', convertRoutes);
 app.use('/api/reset-password', changePassword);
 app.use('/api/forgot-password', forgotPassword);
+app.use('/api/transfers', lastMovement);
+app.use('/api/cupones', validateCuponRoute);
+app.use('/api/cupon', cuponRoutes);
 const PORT = process.env.PORT || 5037;
 app.listen(PORT, () => {
   console.log(`Servidor ejecutándose en http://localhost:${PORT}`);

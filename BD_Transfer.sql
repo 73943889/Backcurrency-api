@@ -72,6 +72,52 @@ CREATE TABLE IF NOT EXISTS company_Client (
 );
 select * from company_Client;
 
+DROP TABLE IF EXISTS cupones;
+CREATE TABLE IF NOT EXISTS cupones (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL,
+  codigo VARCHAR(20) NOT NULL UNIQUE,
+  descuento DECIMAL(5,4) NOT NULL DEFAULT 0.00,
+  -- Expiración por tiempo
+  expiracion DATETIME DEFAULT NULL,
+  -- Expiración por uso
+  usos_maximos INT DEFAULT NULL,
+  usos_actuales INT DEFAULT 0,
+  -- Tipo de expiración: 'tiempo', 'uso', o NULL si no expira
+  tipo_expiracion ENUM('tiempo', 'uso') DEFAULT NULL,
+  usado BOOLEAN DEFAULT FALSE,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+-- insertion por tiempo
+INSERT INTO cupones (user_id, codigo, descuento, expiracion, tipo_expiracion)
+VALUES (1, 'ABC123XYZ', 00.0002, DATE_ADD(NOW(), INTERVAL 3 DAY), 'tiempo');
+
+-- insertion por numero de transferencias
+INSERT INTO cupones (user_id, codigo, descuento, usos_maximos, tipo_expiracion)
+VALUES (3, 'XYZ987LMN', 15.00, 5, 'uso');
+
+select * from cupones;
+UPDATE cupones set usos_maximos=2 where id=2;
+
+DROP TABLE IF EXISTS config_cupones;
+CREATE TABLE IF NOT EXISTS config_cupones (
+  id INT PRIMARY KEY,
+  activa BOOLEAN DEFAULT TRUE, -- para activar/desactivar la promoción
+  tipo_expiracion ENUM('tiempo', 'uso', 'ambos') NOT NULL,
+  duracion_valor INT DEFAULT NULL, -- solo si tipo incluye 'tiempo'
+  duracion_unidad ENUM('minuto', 'hora', 'dia', 'semana', 'mes') DEFAULT NULL,
+  usos_maximos INT DEFAULT NULL, -- solo si tipo incluye 'uso'
+  descuento DECIMAL(5,4) NOT NULL,
+  descripcion TEXT,
+  creada_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+-- 🎯 Promoción por uso (5 transferencias)
+INSERT INTO config_cupones (id, activa, tipo_expiracion, duracion_valor, duracion_unidad,usos_maximos, descuento, descripcion) 
+VALUES (1, TRUE, 'uso', NULL, NULL, 5, 0.0002, 'Cupón válido para 5 transferencias');
+
+Select * from config_cupones;
+
 -- Verificar si la tabla existe y eliminarla
 DROP TABLE IF EXISTS conversions;
 
@@ -124,10 +170,12 @@ CREATE TABLE transferencias (
   fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id)
 );
+ALTER TABLE transferencias ADD moneda VARCHAR(3) DEFAULT 'PEN';
 delete from transferencias where email='danielgastelu.s@gmail.com';
 select * from transferencias;
 select * from api_keys;
 select * from users;
 select * from transfers;
 SELECT * FROM password_resets ORDER BY created_at DESC LIMIT 1;
-
+SELECT id, name, email FROM personal_Client;
+ALTER TABLE transferencias ADD COLUMN cupon VARCHAR(10) NULL;
