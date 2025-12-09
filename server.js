@@ -1,13 +1,5 @@
 // server.js
 
-process.on('uncaughtException', err => {
-  console.error('💥 ERROR GLOBAL:', err);
-});
-
-process.on('unhandledRejection', err => {
-  console.error('💥 PROMESA RECHAZADA:', err);
-});
-
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
@@ -52,11 +44,6 @@ app.use('/api/cupones', validateCuponRoute);
 app.use('/api/cupon', cuponRoutes);
 //const PORT = process.env.PORT || 5037;
 const PORT = 3000;
-
-app.get('/api/test', (req, res) => {
-  res.json({ status: 'Servidor funcionando OK ✅' });
-});
-
 
 app.listen(PORT,'0.0.0.0', () => {
   console.log(`Servidor ejecutándose en http://0.0.0.0:${PORT}`);
