@@ -19,6 +19,8 @@ const forgotPassword = require('./src/routes/forgotPasswordRoutes');
 const lastMovement = require('./src/routes/LastTransfersRoutes');
 const validateCuponRoute = require('./src/routes/validateCuponRoutes');
 const cuponRoutes = require('./src/routes/cuponRoutes');
+const exchangeRatesRoutes = require('./src/routes/exchangeRatesRoutes');
+
 const app = express();
 
 app.use(cors({
@@ -42,6 +44,7 @@ app.use('/api/forgot-password', forgotPassword);
 app.use('/api/transfers', lastMovement);
 app.use('/api/cupones', validateCuponRoute);
 app.use('/api/cupon', cuponRoutes);
+app.use('/api', exchangeRatesRoutes);
 //const PORT = process.env.PORT || 5037;
 const PORT = 3000;
 
