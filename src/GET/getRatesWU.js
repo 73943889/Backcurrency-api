@@ -1,4 +1,4 @@
-const puppeteer = require('puppeteer');
+/*const puppeteer = require('puppeteer');
 
 const getWesternUnionRates = async () => {
   const browser = await puppeteer.launch({
@@ -30,6 +30,16 @@ const getWesternUnionRates = async () => {
     await browser.close();
     throw new Error('No se pudo obtener las tasas de cambio desde Western Union');
   }
+};
+
+module.exports = getWesternUnionRates;*/
+const getWesternUnionRates = async () => {
+  return {
+    penToUsd: {
+      compra: "3.78",
+      venta: "3.84"
+    }
+  };
 };
 
 module.exports = getWesternUnionRates;
