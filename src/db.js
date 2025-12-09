@@ -74,7 +74,6 @@ const db = mysql.createPool({
   connectTimeout: 10000
 });
 
-// ✅ Test automático de conexión
 db.getConnection()
   .then(conn => {
     console.log("✅ MySQL conectado correctamente a", process.env.RAILWAY_ENV);
