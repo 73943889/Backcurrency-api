@@ -5,10 +5,18 @@ const getExchangeRates = require('../GET/getExchangeRates');
 router.get('/rates', async (req, res) => {
   try {
     const rates = await getExchangeRates();
-    res.json(rates);
+
+    return res.json({
+      success: true,
+      rates
+    });
+
   } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al obtener tasas' });
+    console.error("❌ Error en /api/rates:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Error al obtener tasas"
+    });
   }
 });
 

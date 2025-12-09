@@ -44,7 +44,7 @@ app.use('/api/forgot-password', forgotPassword);
 app.use('/api/transfers', lastMovement);
 app.use('/api/cupones', validateCuponRoute);
 app.use('/api/cupon', cuponRoutes);
-app.use('/api', exchangeRatesRoutes);
+app.use('/api/exchange', exchangeRatesRoutes);
 //const PORT = process.env.PORT || 5037;
 const PORT = 3000;
 

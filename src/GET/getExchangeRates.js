@@ -1,25 +1,23 @@
-const puppeteer = require('puppeteer');
-router.get('/rates', async (req, res) => {
-  try {
-    const [rows] = await db.query(
-      'SELECT from_currency, to_currency, buy_rate, sell_rate FROM exchange_rates WHERE active = 1'
-    );
+const pool = require('../db'); // ✅ igual que tu otro ejemplo
 
-    const formatted = {};
+const getExchangeRates = async () => {
+  const [rows] = await pool.query(`
+    SELECT from_currency, to_currency, buy_rate, sell_rate
+    FROM exchange_rates
+    WHERE active = 1
+  `);
 
-    rows.forEach(rate => {
-      const key = `${rate.from_currency}_${rate.to_currency}`;
-      formatted[key] = {
-        buy: rate.buy_rate,
-        sell: rate.sell_rate
-      };
-    });
+  const formatted = {};
 
-    res.json(formatted);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ message: 'Error al obtener tasas' });
-  }
-});
+  rows.forEach(rate => {
+    const key = `${rate.from_currency}_${rate.to_currency}`;
+    formatted[key] = {
+      buy: rate.buy_rate,
+      sell: rate.sell_rate
+    };
+  });
 
-module.exports = router;
+  return formatted; // ✅ SOLO RETORNA DATA
+};
+
+module.exports = getExchangeRates; 
