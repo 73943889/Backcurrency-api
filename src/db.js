@@ -76,13 +76,17 @@ if (env === 'staging' || env === 'production') {
 // ===============================================
 
 const db = mysql.createPool({
-    ...dbConfig,
-    waitForConnections: true,
-    connectionLimit: 5,
-    queueLimit: 0,
-    connectTimeout: 15000 // Incrementamos el timeout a 15s
+    ...dbConfig,
+    waitForConnections: true,
+    connectionLimit: 5,
+    queueLimit: 0,
+    
+    // Añadimos y ajustamos tiempos de espera
+    connectTimeout: 20000,   // Tiempo para establecer la conexión
+    acquireTimeout: 20000,   // Tiempo para tomar una conexión del pool
+    idleTimeout: 60000,      // Tiempo que una conexión puede estar inactiva antes de ser cerrada
+    enableKeepAlive: true,   // Mantiene las conexiones activas
 });
-
 // ===============================================
 // 🤝 PRUEBA DE CONEXIÓN
 // ===============================================
