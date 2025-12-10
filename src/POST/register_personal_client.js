@@ -35,7 +35,7 @@ const registerPersonalClient = async (req, res) => {
 
     // Verificar duplicados en personal_Client
     const [results] = await connection.query(`
-      SELECT email, dni, phone FROM personal_Client
+      SELECT email, dni, phone FROM personal_client
       WHERE dni = ? OR phone = ?
     `, [dni, phone]);
 
@@ -62,7 +62,7 @@ const registerPersonalClient = async (req, res) => {
 
     // Insertar en personal_Client
     await connection.query(`
-      INSERT INTO personal_Client (user_id, name, email, password, dni, phone, created_at)
+      INSERT INTO personal_client (user_id, name, email, password, dni, phone, created_at)
       VALUES (?, ?, ?, ?, ?, ?, NOW())
     `, [userId, name, email, password, dni, phone]);
 
