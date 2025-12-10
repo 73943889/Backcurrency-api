@@ -1,4 +1,3 @@
-// Archivo de Router (ej. routes/exchange.js)
 const express = require('express');
 const router = express.Router();
 const getExchangeRates = require('../GET/getExchangeRates');
