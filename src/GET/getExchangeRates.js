@@ -25,10 +25,10 @@ const pool = require('../db');
 
 const getExchangeRates = async () => {
   const [rows] = await pool.query(`
-    SELECT from_currency, to_currency, buy_rate, sell_rate
-    FROM exchange_rates
-    WHERE active = 1
-  `);
+SELECT from_currency, to_currency, buy_rate, sell_rate
+FROM exchange_rates
+WHERE active = 1
+`.trim());
 
   const formatted = {};
 
