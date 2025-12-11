@@ -137,10 +137,7 @@ const registerTransferHandler = async (req, res) => {
     }
 
     // 3. 📝 Insertar transferencia (Mantenida)
-    const insertQuery = `
-      INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `.trim();
+  const insertQuery = "INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     await connection.query(insertQuery, [
       userIdInt, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobanteUrl, cupon, moneda
