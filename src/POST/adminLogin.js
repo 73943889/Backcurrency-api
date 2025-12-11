@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET;
-
+const TOKEN_DURATION = '1m';
 const adminLoginHandler = (req, res) => {
     const { username, password } = req.body;
 
@@ -13,12 +13,13 @@ const adminLoginHandler = (req, res) => {
         const token = jwt.sign({ 
             id: username, // usar el username como ID
             role: 'admin' 
-        }, JWT_SECRET, { expiresIn: '1h' }); 
+        }, JWT_SECRET, { expiresIn: TOKEN_DURATION }); 
 
         return res.status(200).json({ 
             success: true, 
             message: "Admin login exitoso", 
-            token: token 
+            token: token ,
+			expires_in: TOKEN_DURATION
         });
     }
 
