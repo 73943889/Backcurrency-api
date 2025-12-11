@@ -37,7 +37,8 @@ const transporter = nodemailer.createTransport({
 // 🧠 Lógica principal para registrar transferencia
 const registerTransferHandler = async (req, res) => {
   console.log('🟢 Iniciando registro de transferencia bancaria');
-
+console.log('DEBUG: Contenido de req.body completo:', req.body);
+console.log('DEBUG: Contenido de req.file completo:', req.file);
   const {
     user_id,
     nombre,
@@ -71,16 +72,21 @@ const registerTransferHandler = async (req, res) => {
 
   // 🔒 Validación de campos
   if (!user_id || !nombre || !dni || !cuenta || !banco || !email || !monto || !cod_aprobacion || !comprobante) {
+    // Si cupon o moneda son "", pasan la validación de arriba, lo cual es correcto.
+    
+    // **Añadir una verificación explícita para user_id si es que llega como cadena 'undefined'**
+    if (user_id === 'undefined') {
+        console.error('❌ user_id llegó como cadena "undefined". Revisar RequestBody en Kotlin.');
+    }
+
+    // 💡 Aquí su log de error original:
     console.error('❌ Faltan campos requeridos o comprobante');
-    // Limpiar archivo si la validación falla
-    if (comprobante && fs.existsSync(comprobante.path)) {
-      fs.unlinkSync(comprobante.path);
-    }
+    // ... (limpieza y respuesta de error)
     return res.status(400).json({
       success: false,
       message: 'Todos los campos y el comprobante son requeridos'
     });
-  }
+}
 
   const comprobanteUrl = comprobante.path;
   let connection; // Para gestionar la conexión y transacción
