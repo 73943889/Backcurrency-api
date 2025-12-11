@@ -1,0 +1,234 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Panel de Administración de Transferencias</title>
+    <style>
+        /* CSS Básico para estética */
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        #login-form, #admin-panel { max-width: 400px; margin: auto; border: 1px solid #ccc; padding: 20px; margin-bottom: 20px; }
+        input[type="text"], input[type="password"] { width: 100%; padding: 10px; margin: 5px 0 15px 0; display: inline-block; border: 1px solid #ccc; box-sizing: border-box; }
+        button { background-color: #4CAF50; color: white; padding: 14px 20px; margin: 8px 0; border: none; cursor: pointer; width: 100%; }
+        .error { color: red; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+    <h2>Panel de Administración</h2>
+    <p id="message" class="error"></p>
+
+    <div id="login-form">
+        <h3>1. Iniciar Sesión</h3>
+        <input type="text" id="username" placeholder="Usuario Admin" required>
+        <input type="password" id="password" placeholder="Contraseña Admin" required>
+        <button onclick="loginAdmin()">Ingresar</button>
+        <p id="login-status"></p>
+    </div>
+
+  <div id="admin-panel" style="display:none;">
+    <h3>2. Auditoría y Control de Transferencias</h3>
+    <p>Token expira en: <span id="token-expiry"></span>. <button onclick="fetchAndRenderTransfers()">Recargar Datos</button></p>
+
+    <div style="margin-bottom: 15px;">
+        <label for="statusFilter">Filtrar por Estado:</label>
+        <select id="statusFilter" onchange="filterTransfers()">
+            <option value="TODAS">TODAS</option>
+            <option value="PENDIENTE" selected>PENDIENTE</option>
+            <option value="COMPLETADA">COMPLETADA</option>
+            <option value="RECHAZADA">RECHAZADA</option>
+        </select>
+    </div>
+    
+    <div style="overflow-x:auto;">
+        <table border="1" style="width:100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Monto</th>
+                    <th>Estado</th>
+                    <th>Banco</th>
+                    <th>Fecha</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="transfer-table-body">
+                <tr><td colspan="7">Inicie sesión para ver las transferencias.</td></tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+    <script>
+        // La URL base de su API desplegada en Railway
+        const API_BASE_URL = "https://backcurrency-api-production-64f5.up.railway.app";
+        let adminToken = '';
+        let tokenExpiryTimeout;
+		let allTransfers = [];
+        // --- FUNCIONES ---
+
+// Función para obtener la lista COMPLETA de transferencias
+async function fetchAndRenderTransfers() {
+    const tableBody = document.getElementById('transfer-table-body');
+    tableBody.innerHTML = '<tr><td colspan="7">Cargando todas las transferencias...</td></tr>';
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/admin/transfers/all`, { // <-- LLAMAMOS A LA NUEVA API
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            allTransfers = data.transfers; // 💡 Guardamos TODA la data
+            filterTransfers(); // Renderizamos aplicando el filtro inicial (PENDIENTE)
+        } else {
+            tableBody.innerHTML = '<tr><td colspan="7">Fallo al cargar datos.</td></tr>';
+        }
+    } catch (error) {
+        tableBody.innerHTML = '<tr><td colspan="7" style="color:red;">Error de red al cargar datos.</td></tr>';
+        console.error('Error al cargar transferencias:', error);
+    }
+}
+
+// 💡 NUEVA FUNCIÓN: Filtra y renderiza la tabla
+function filterTransfers() {
+    const status = document.getElementById('statusFilter').value;
+    const tableBody = document.getElementById('transfer-table-body');
+    tableBody.innerHTML = ''; // Limpiar
+
+    const filteredList = (status === 'TODAS') 
+        ? allTransfers
+        : allTransfers.filter(t => t.estado === status);
+
+    if (filteredList.length === 0) {
+        tableBody.innerHTML = `<tr><td colspan="7">No hay transferencias con estado ${status}.</td></tr>`;
+        return;
+    }
+    
+    filteredList.forEach(transfer => {
+        const row = tableBody.insertRow();
+        row.insertCell(0).textContent = transfer.id;
+        row.insertCell(1).textContent = transfer.user_nombre;
+        row.insertCell(2).textContent = `${transfer.moneda} ${transfer.monto}`;
+        // 💡 ESTADO ACTUAL: Lo mostramos
+        row.insertCell(3).textContent = transfer.estado; 
+        
+        row.insertCell(4).textContent = transfer.banco;
+        row.insertCell(5).textContent = new Date(transfer.fecha_registro).toLocaleString();
+        
+        // 💡 Crear el Combobox de Acción
+        const statusCell = row.insertCell(6);
+        statusCell.innerHTML = `
+            <select onchange="handleStatusChange(${transfer.id}, this.value)">
+                <option value="" disabled selected>Cambiar a...</option>
+                <option value="COMPLETADA">COMPLETADA</option>
+                <option value="RECHAZADA">RECHAZADA</option>
+                <option value="PENDIENTE">PENDIENTE</option>
+            </select>`;
+    });
+}
+
+// --- MODIFICAR handleStatusChange ---
+async function handleStatusChange(transferId, nuevoEstado) {
+    // ... (lógica de confirmación y llamada a la API)
+    
+    // DESPUÉS DE LA LÍNEA: alert(`Transferencia ${transferId} marcada como ${nuevoEstado}.`);
+    if (data.success) {
+        alert(`Transferencia ${transferId} marcada como ${nuevoEstado}.`);
+        // 💡 Después de actualizar, recargamos la lista COMPLETA del servidor
+        fetchAndRenderTransfers(); 
+    } else {
+        // ...
+    }
+}
+
+        // Función para el Login (Paso 1)
+        async function loginAdmin() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const statusElement = document.getElementById('login-status');
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    adminToken = data.token;
+                    statusElement.textContent = `Éxito. Token obtenido.`;
+                    
+                    // Mostrar panel de control y ocultar login
+                    document.getElementById('login-form').style.display = 'none';
+                    document.getElementById('admin-panel').style.display = 'block';
+
+                    // Mostrar expiración
+                    const expiry = data.expires_in;
+                    document.getElementById('token-expiry').textContent = expiry;
+
+                    // Establecer temporizador para forzar el re-login cuando expire
+                    const minutes = parseInt(expiry.replace('m', '')); // Obtener 5 de '5m'
+                    clearTimeout(tokenExpiryTimeout);
+                    tokenExpiryTimeout = setTimeout(() => {
+                        alert("Token expirado. Por favor, inicie sesión de nuevo.");
+                        window.location.reload(); // Recargar la página para limpiar el token
+                    }, minutes * 60 * 1000); 
+
+                } else {
+                    statusElement.textContent = `Error: ${data.message}`;
+                }
+            } catch (error) {
+                statusElement.textContent = `Error de conexión con la API.`;
+                console.error('Error:', error);
+            }
+        }
+
+        // Función para Actualizar el Estado (Paso 2)
+        async function updateTransfer() {
+            const transferId = document.getElementById('transferId').value;
+            const nuevoEstado = document.getElementById('newStatus').value;
+            const updateStatusElement = document.getElementById('update-status');
+
+            if (!adminToken) {
+                updateStatusElement.textContent = "Error: No ha iniciado sesión.";
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/api/admin/transfer/update`, {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${adminToken}` // **USO DEL TOKEN**
+                    },
+                    body: JSON.stringify({ transferId, nuevoEstado })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStatusElement.textContent = `Éxito: ${data.message}`;
+                    updateStatusElement.style.color = 'green';
+                } else {
+                    updateStatusElement.textContent = `Fallo: ${data.message}`;
+                    updateStatusElement.style.color = 'red';
+
+                    if (response.status === 400 || response.status === 401) {
+                         alert("Token inválido/expirado. Re-inicie sesión.");
+                         window.location.reload(); 
+                    }
+                }
+            } catch (error) {
+                updateStatusElement.textContent = `Error de conexión con la API.`;
+                console.error('Error:', error);
+            }
+        }
+    </script>
+
+</body>
+</html>
