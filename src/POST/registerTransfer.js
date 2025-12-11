@@ -19,7 +19,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 📧 Configuración de transporte para correos (Sin cambios)
+// 📧 Configuración de transporte para correos (Puerto 465 y secure: true)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 465,
@@ -115,26 +115,26 @@ const registerTransferHandler = async (req, res) => {
 
     // ... Validación y actualización del cupón (Mantenida)
     if (cupon) {
-        // ... (Lógica de validación y update del cupón)
-        console.log('🔍 Validando y actualizando cupón:', cupon);
+        // ... (Lógica de validación y update del cupón)
+        console.log('🔍 Validando y actualizando cupón:', cupon);
 
-        const [cuponRows] = await connection.query(`SELECT * FROM cupones WHERE codigo = ?`, [cupon]);
-        const cuponData = cuponRows[0];
-        const isInvalid = cuponRows.length === 0 || cuponData.usos_actuales >= cuponData.usos_maximos;
+        const [cuponRows] = await connection.query(`SELECT * FROM cupones WHERE codigo = ?`, [cupon]);
+        const cuponData = cuponRows[0];
+        const isInvalid = cuponRows.length === 0 || cuponData.usos_actuales >= cuponData.usos_maximos;
 
-        if (isInvalid) {
-            await connection.rollback();
-            const msg = (cuponRows.length === 0) ? 'Cupón inválido' : 'Cupón sin usos disponibles';
-            console.error(`❌ ${msg}`);
-            return res.status(400).json({ success: false, message: msg });
-        }
+        if (isInvalid) {
+            await connection.rollback();
+            const msg = (cuponRows.length === 0) ? 'Cupón inválido' : 'Cupón sin usos disponibles';
+            console.error(`❌ ${msg}`);
+            return res.status(400).json({ success: false, message: msg });
+        }
 
-        await connection.query(`UPDATE cupones SET usos_actuales = usos_actuales + 1 WHERE id = ?`, [cuponData.id]);
-        console.log('✅ Cupón validado y actualizado');
+        await connection.query(`UPDATE cupones SET usos_actuales = usos_actuales + 1 WHERE id = ?`, [cuponData.id]);
+        console.log('✅ Cupón validado y actualizado');
     }
 
-    // 3. 📝 Insertar transferencia (Mantenida)
-  const insertQuery = "INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    // 3. 📝 Insertar transferencia (Consulta de una sola línea, mantenida para evitar error 1064)
+    const insertQuery = "INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     await connection.query(insertQuery, [
       userIdInt, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobanteUrl, cupon, moneda
@@ -144,23 +144,25 @@ const registerTransferHandler = async (req, res) => {
     await connection.commit();
     console.log('✅ Transferencia registrada y confirmada (COMMIT) en base de datos');
 
-    // 🏆 CORRECCIÓN CLAVE: RESPUESTA AL CLIENTE INMEDIATAMENTE DESPUÉS DEL COMMIT
+    // 🏆 RESPUESTA AL CLIENTE INMEDIATAMENTE DESPUÉS DEL COMMIT (Resuelve el error 499)
     res.status(201).json({ success: true, message: 'Transferencia registrada con éxito' });
 
 
     // ----------------------------------------------------
-    // 5. ENVIAR CORREO (EJECUTAR EN SEGUNDO PLANO SIN AWAIT)
+    // 5. ENVIAR CORREO (RECIBO FORMAL DE ESTADO PENDIENTE)
     // ----------------------------------------------------
-    // Esta función se ejecuta de forma asíncrona y no bloqueará el hilo
-    // después de que la respuesta (res.send) haya sido enviada.
-    (async () => {
+    // Se ejecuta de forma asíncrona y no bloquea el hilo principal.
+    (async () => {
         const mailOptions = {
           from: process.env.MAIL_USER,
           to: email,
-          subject: 'Transferencia registrada correctamente',
+            // 💡 CAMBIO CRÍTICO: Asunto que refleja el estado PENDIENTE
+          subject: 'Recibo Oficial: Transferencia Registrada - Estado: PENDIENTE DE VERIFICACIÓN',
           html: `
             <h2>Hola ${nombre},</h2>
-            <p>Tu transferencia ha sido registrada y está siendo procesada:</p>
+            <p>Hemos recibido tu solicitud de transferencia. Los detalles están siendo verificados contra el comprobante adjunto.</p>
+            <p style="color: red; font-weight: bold;">El estado actual de tu transferencia es: PENDIENTE DE VERIFICACIÓN.</p>
+            <p>Puedes seguir el progreso en la sección "Últimos movimientos" de tu aplicación.</p>
             <ul>
               <li><strong>Monto:</strong> ${moneda} ${monto}</li>
               <li><strong>Código de aprobación:</strong> ${cod_aprobacion}</li>
@@ -179,16 +181,16 @@ const registerTransferHandler = async (req, res) => {
             const info = await transporter.sendMail(mailOptions);
             console.log('📧 Correo de notificación enviado (en background):', info.response);
         } catch (mailError) {
+            // Este es el error de Connection Timeout que necesitamos diagnosticar
             console.error('❌ Error al enviar correo (fallo de notificación no crítico):', mailError.message || mailError);
         }
-    })(); // Se invoca inmediatamente
+    })(); // Se invoca inmediatamente
 
   } catch (error) {
     // ----------------------------------------------------
     // 6. ROLLBACK Y LIMPIEZA PROTEGIDA (Mantenida)
     // ----------------------------------------------------
-    // NOTA: Si ya se envió la respuesta 201 arriba, este error generará un 500 en la consola,
-    // pero el cliente ya habrá recibido el éxito.
+    
     if (connection) {
       await connection.rollback(); 
       console.log('❌ Se ejecutó ROLLBACK debido a un error interno o de BD.');
@@ -206,9 +208,9 @@ const registerTransferHandler = async (req, res) => {
 
     console.error('❌ ERROR CRÍTICO EN PROCESAMIENTO:', error);
     // Si no se ha enviado la respuesta, envía el 500
-    if (!res.headersSent) {
-        res.status(500).json({ success: false, message: 'Error al registrar transferencia' });
-    }
+    if (!res.headersSent) {
+        res.status(500).json({ success: false, message: 'Error al registrar transferencia' });
+    }
   } finally {
     // 7. LIBERAR CONEXIÓN (Mantenida)
     if (connection) {
