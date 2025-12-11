@@ -72,7 +72,7 @@ const registerTransferHandler = async (req, res) => {
   // 🔒 Validación de campos
   if (!user_id || !nombre || !dni || !cuenta || !banco || !email || !monto || !cod_aprobacion || !comprobante) {
     console.error('❌ Faltan campos requeridos o comprobante');
-    // 💡 Limpiar archivo si la validación falla
+    // Limpiar archivo si la validación falla
     if (comprobante && fs.existsSync(comprobante.path)) {
       fs.unlinkSync(comprobante.path);
     }
@@ -89,8 +89,6 @@ const registerTransferHandler = async (req, res) => {
     // ----------------------------------------------------
     // 1. INICIAR TRANSACCIÓN (Para atomicidad Cupón + Transferencia)
     // ----------------------------------------------------
-    // 💡 IMPORTANTE: 'pool.getConnection' y 'connection.beginTransaction/commit'
-    // depende de la librería de DB que esté usando (ej. mysql2 o pg).
     connection = await pool.getConnection(); 
     await connection.beginTransaction(); 
     console.log('✅ Transacción iniciada');
@@ -99,8 +97,8 @@ const registerTransferHandler = async (req, res) => {
     // ✅ Conversión segura de user_id
     const userIdInt = parseInt(user_id, 10);
     if (isNaN(userIdInt)) {
-      console.error('❌ user_id inválido:', user_id);
       await connection.rollback(); 
+      console.error('❌ user_id inválido:', user_id);
       return res.status(400).json({ success: false, message: 'ID de usuario inválido' });
     }
 
@@ -108,7 +106,7 @@ const registerTransferHandler = async (req, res) => {
     if (cupon) {
       console.log('🔍 Validando y actualizando cupón:', cupon);
 
-      const [cuponRows] = await connection.query( // Usar connection.query
+      const [cuponRows] = await connection.query(
         `SELECT * FROM cupones WHERE codigo = ?`,
         [cupon]
       );
@@ -124,7 +122,7 @@ const registerTransferHandler = async (req, res) => {
       }
 
       // ✅ Actualizar uso (+1)
-      await connection.query( // Usar connection.query
+      await connection.query(
         `UPDATE cupones SET usos_actuales = usos_actuales + 1 WHERE id = ?`,
         [cuponData.id]
       );
@@ -132,8 +130,8 @@ const registerTransferHandler = async (req, res) => {
       console.log('✅ Cupón validado y actualizado');
     }
 
-    // 3. 📝 Insertar transferencia
-    await connection.query(` // Usar connection.query
+    // 3. 📝 Insertar transferencia (CÓDIGO SQL LIMPIO)
+    await connection.query(`
       INSERT INTO transferencias (
         user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -155,8 +153,9 @@ const registerTransferHandler = async (req, res) => {
     await connection.commit();
     console.log('✅ Transferencia registrada y confirmada (COMMIT) en base de datos');
 
+
     // ----------------------------------------------------
-    // 5. ENVIAR CORREO (Fuera de la transacción de BD)
+    // 5. ENVIAR CORREO
     // ----------------------------------------------------
     const mailOptions = {
       from: process.env.MAIL_USER,
@@ -179,12 +178,10 @@ const registerTransferHandler = async (req, res) => {
       ]
     };
     
-    // 💡 USAR ASYNC/AWAIT para capturar ETIMEDOUT y errores de autenticación
     try {
         const info = await transporter.sendMail(mailOptions);
         console.log('📧 Correo enviado correctamente:', info.response);
     } catch (mailError) {
-        // La transferencia ya se registró. Solo logueamos el fallo del correo.
         console.error('❌ Error al enviar correo (fallo de notificación):', mailError.message || mailError);
     }
     // ----------------------------------------------------
@@ -196,7 +193,7 @@ const registerTransferHandler = async (req, res) => {
     // 6. ROLLBACK Y LIMPIEZA
     // ----------------------------------------------------
     if (connection) {
-      await connection.rollback(); // <-- REVOCAR CAMBIOS si algo falló antes del commit
+      await connection.rollback(); 
       console.log('❌ Se ejecutó ROLLBACK debido a un error interno o de BD.');
     }
     // Limpiar el archivo subido si la BD falló
@@ -213,6 +210,11 @@ const registerTransferHandler = async (req, res) => {
         console.log('✅ Conexión a BD liberada.');
     }
   }
+};
+
+module.exports = {
+  uploadComprobante: upload.single('comprobante'),
+  registerTransferHandler
 };
 
 module.exports = {
