@@ -21,13 +21,19 @@ const upload = multer({ storage });
 
 // 📧 Configuración de transporte para correos (Puerto 465 y secure: true)
 const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 465,
-  secure: true,
-  auth: {
-    user: process.env.MAIL_USER,
-    pass: process.env.MAIL_PASS
-  },
+    // Usa las variables de entorno configuradas en Railway
+    host: process.env.MAIL_HOST, 
+    port: process.env.MAIL_PORT,
+    // Puerto 587 usa STARTTLS, por lo que 'secure' es false
+    secure: false, 
+    auth: {
+        user: process.env.MAIL_USER,
+        pass: process.env.MAIL_PASS
+    },
+    // Recomendado para puerto 587
+    tls: {
+        ciphers: 'SSLv3' 
+    }
 });
 
 // 🧠 Lógica principal para registrar transferencia

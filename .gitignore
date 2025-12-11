@@ -1,0 +1,2 @@
+# Archivos de entorno - NUNCA deben subirse a Git
+.env
