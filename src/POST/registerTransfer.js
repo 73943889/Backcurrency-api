@@ -21,21 +21,19 @@ const upload = multer({ storage });
 
 // 📧 Configuración de transporte para correos (Puerto 465 y secure: true)
 const transporter = nodemailer.createTransport({
-    // Usa las variables de entorno configuradas en Railway
-    host: process.env.MAIL_HOST, 
-    port: process.env.MAIL_PORT,
-    // Puerto 587 usa STARTTLS, por lo que 'secure' es false
+    // 💡 CAMBIO CRÍTICO: Usamos el HOST de Brevo directamente para evitar cualquier fallo de lectura
+    host: 'smtp-relay.brevo.com', 
+    port: process.env.MAIL_PORT || 587,
     secure: false, 
     auth: {
         user: process.env.MAIL_USER,
         pass: process.env.MAIL_PASS
     },
-    // Recomendado para puerto 587
+    name: 'smtp-relay.brevo.com', 
     tls: {
         ciphers: 'SSLv3' 
     }
 });
-
 // 🧠 Lógica principal para registrar transferencia
 const registerTransferHandler = async (req, res) => {
   console.log('🟢 Iniciando registro de transferencia bancaria');
