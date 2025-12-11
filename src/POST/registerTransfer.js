@@ -8,6 +8,7 @@ const nodemailer = require('nodemailer');
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const dir = 'uploads/comprobantes';
+    // Asegura que el directorio existe
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -18,7 +19,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// 📧 Configuración de transporte para correos
+// 📧 Configuración de transporte para correos (Asegúrese de usar App Password si usa Gmail)
 const transporter = nodemailer.createTransport({
   host: 'smtp.gmail.com',
   port: 587,
@@ -40,7 +41,7 @@ const registerTransferHandler = async (req, res) => {
   console.log('DEBUG: Contenido de req.body completo:', req.body);
   console.log('DEBUG: Contenido de req.file completo:', req.file);
   
-  // Desestructuramos solo los campos que sabemos que llegan, y obtenemos los opcionales/críticos de forma segura
+  // Desestructuramos los campos que deben estar en req.body
   const {
     nombre,
     dni,
@@ -51,14 +52,14 @@ const registerTransferHandler = async (req, res) => {
     cod_aprobacion,
   } = req.body;
 
-  // 💡 OBTENER CAMPOS FALTANTES DE FORMA SEGURA (Si Kotlin los omite, serán 'undefined', se setean a "" o null)
+  // OBTENER CAMPOS FALTANTES/OPCIONALES DE FORMA SEGURA
   const user_id = req.body.user_id;
   const cupon = req.body.cupon || null; // Usamos null para la BD si está vacío
   const moneda = req.body.moneda || "";
 
   const comprobante = req.file;
   
-  // Agregando el nombre de archivo seguro al log
+  // Log de datos recibidos
   const comprobanteNombre = comprobante ? path.basename(comprobante.path) : 'NULO';
 
   console.log('📩 Datos recibidos (Procesados):', {
@@ -79,7 +80,8 @@ const registerTransferHandler = async (req, res) => {
   if (!user_id || !nombre || !dni || !cuenta || !banco || !email || !monto || !cod_aprobacion || !comprobante) {
     
     console.error('❌ Faltan campos requeridos. ID de usuario o Comprobante son nulos/vacíos.');
-    // Limpiar archivo si la validación falla (protegido con try/catch)
+    
+    // Limpiar archivo si la validación falla (protegido)
     if (comprobante && comprobante.path) {
         try {
             fs.unlinkSync(comprobante.path);
@@ -109,7 +111,7 @@ const registerTransferHandler = async (req, res) => {
 
     // ✅ Conversión segura de user_id
     const userIdInt = parseInt(user_id, 10);
-    if (isNaN(userIdInt) || userIdInt <= 0) { // Mayor validación para IDs negativos
+    if (isNaN(userIdInt) || userIdInt <= 0) { 
       await connection.rollback(); 
       console.error('❌ user_id inválido o negativo:', user_id);
       return res.status(400).json({ success: false, message: 'ID de usuario inválido' });
@@ -119,6 +121,7 @@ const registerTransferHandler = async (req, res) => {
     if (cupon) {
       console.log('🔍 Validando y actualizando cupón:', cupon);
 
+      // Lógica para obtener y validar cupón...
       const [cuponRows] = await connection.query(
         `SELECT * FROM cupones WHERE codigo = ?`,
         [cupon]
@@ -144,11 +147,13 @@ const registerTransferHandler = async (req, res) => {
     }
 
     // 3. 📝 Insertar transferencia
-    await connection.query(`
-      INSERT INTO transferencias (
-        user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `, [
+    // 🏆 CORRECCIÓN DEL ERROR 1064: La consulta se limpia para evitar caracteres invisibles
+    const insertQuery = `
+      INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) 
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `.trim(); // El .trim() elimina espacios y saltos de línea conflictivos.
+    
+    await connection.query(insertQuery, [
       userIdInt,
       nombre,
       dni,
@@ -168,10 +173,29 @@ const registerTransferHandler = async (req, res) => {
 
 
     // ----------------------------------------------------
-    // 5. ENVIAR CORREO (Lógica mantenida)
+    // 5. ENVIAR CORREO
     // ----------------------------------------------------
-    // ... (lógica de envío de correo aquí)
-    const mailOptions = { /* ... */ };
+    const mailOptions = {
+      from: process.env.MAIL_USER,
+      to: email,
+      subject: 'Transferencia registrada correctamente',
+      html: `
+        <h2>Hola ${nombre},</h2>
+        <p>Tu transferencia ha sido registrada y está siendo procesada:</p>
+        <ul>
+          <li><strong>Monto:</strong> ${moneda} ${monto}</li>
+          <li><strong>Código de aprobación:</strong> ${cod_aprobacion}</li>
+          ${cupon ? `<li><strong>Cupón aplicado:</strong> ${cupon}</li>` : ''}
+        </ul>
+      `,
+      attachments: [
+        {
+          filename: comprobante.originalname,
+          path: comprobante.path
+        }
+      ]
+    };
+    
     try {
         const info = await transporter.sendMail(mailOptions);
         console.log('📧 Correo enviado correctamente:', info.response);
@@ -202,6 +226,7 @@ const registerTransferHandler = async (req, res) => {
     }
 
     console.error('❌ ERROR CRÍTICO EN PROCESAMIENTO:', error);
+    // Si el error es un error de BD, el código es 500
     res.status(500).json({ success: false, message: 'Error al registrar transferencia' });
   } finally {
     // 7. LIBERAR CONEXIÓN
