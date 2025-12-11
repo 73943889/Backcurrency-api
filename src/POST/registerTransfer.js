@@ -21,15 +21,15 @@ const upload = multer({ storage });
 
 // 📧 Configuración de transporte para correos (Puerto 465 y secure: true)
 const transporter = nodemailer.createTransport({
-    // 💡 CAMBIO CRÍTICO: Usamos el HOST de Brevo directamente para evitar cualquier fallo de lectura
-    host: 'smtp-relay.brevo.com', 
+    // Usamos el host directo de Resend
+    host: 'smtp.resend.com', 
     port: process.env.MAIL_PORT || 587,
     secure: false, 
     auth: {
-        user: process.env.MAIL_USER,
-        pass: process.env.MAIL_PASS
+        user: process.env.MAIL_USER, // Leerá 'resend'
+        pass: process.env.MAIL_PASS // Leerá la API Key
     },
-    name: 'smtp-relay.brevo.com', 
+    name: 'smtp.resend.com', 
     tls: {
         ciphers: 'SSLv3' 
     }
