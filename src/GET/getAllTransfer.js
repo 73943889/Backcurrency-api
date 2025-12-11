@@ -13,7 +13,7 @@ const getAllTransfersHandler = async (req, res) => {
                 t.monto, 
                 t.moneda,
                 t.banco,
-                t.fecha_registro,
+                t.fecha,
                 t.estado,
                 u.nombre AS user_nombre,
                 u.email AS user_email
