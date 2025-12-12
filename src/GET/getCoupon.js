@@ -309,4 +309,51 @@ exports.toggleRuleStatus = async (req, res) => {
             connection.release();
         }
     }
-}; // <--- SINTAXIS CORREGIDA
+};
+
+
+/**
+ * Asigna un cupón existente a un user_id específico.
+ * @route POST /api/admin/coupon/assign
+ */
+exports.assignCouponToUser = async (req, res) => {
+    try {
+        const { couponId, userId } = req.body;
+
+        if (!couponId || !userId) {
+            return res.status(400).json({ success: false, message: "ID de cupón y ID de usuario son obligatorios." });
+        }
+
+        // 1. Validar que el cupón exista
+        const [existing] = await db.execute('SELECT id, user_id FROM cupones WHERE id = ?', [couponId]);
+        if (existing.length === 0) {
+            return res.status(404).json({ success: false, message: "Cupón no encontrado." });
+        }
+        
+        // 2. Realizar la asignación
+        const sql = `UPDATE cupones SET user_id = ? WHERE id = ?`;
+        const [result] = await db.execute(sql, [userId, couponId]);
+
+        if (result.affectedRows === 0) {
+            return res.status(500).json({ success: false, message: "Fallo al asignar el cupón (posiblemente ya estaba asignado a ese ID)." });
+        }
+
+        return res.json({
+            success: true,
+            message: `Cupón ID ${couponId} asignado con éxito al usuario ID ${userId}.`
+        });
+
+    } catch (error) {
+        console.error("❌ Error al asignar cupón:", error);
+        // Error de SQL (ej. violación de FOREIGN KEY si el usuario no existe)
+        let errorMessage = "Error interno del servidor al asignar el cupón.";
+        if (error.sqlMessage) {
+            errorMessage = `Error de Base de Datos: ${error.sqlMessage}. Revise si el ID de usuario existe.`;
+        }
+
+        return res.status(500).json({
+            success: false,
+            message: errorMessage
+        });
+    }
+};
