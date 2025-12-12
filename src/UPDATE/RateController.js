@@ -6,11 +6,11 @@ const pool = require('../db');
 const getAllRates = async (req, res) => {
     try {
         // Asumiendo que tu tabla de tasas se llama 'exchange_rates'
-        const [rows] = await pool.execute('SELECT base_currency, target_currency, buy_rate, sell_rate FROM exchange_rates');
+        const [rows] = await pool.execute('SELECT from_currency, to_currency, buy_rate, sell_rate FROM exchange_rates');
         
         res.status(200).json({ 
             success: true, 
-            rates: rows // Array de 6 objetos {base_currency, target_currency, buy_rate, sell_rate}
+            rates: rows // Array de 6 objetos {from_currency, to_currency, buy_rate, sell_rate}
         });
 
     } catch (error) {
@@ -27,7 +27,7 @@ const getAllRates = async (req, res) => {
  * Maneja POST /api/admin/rates/update-all
  */
 const updateAllRates = async (req, res) => {
-    // El frontend envía: { rates: [ {base_currency, target_currency, buy_rate, sell_rate}, ... ] }
+    // El frontend envía: { rates: [ {from_currency, to_currency, buy_rate, sell_rate}, ... ] }
     const { rates } = req.body; 
 
     if (!rates || !Array.isArray(rates) || rates.length === 0) {
@@ -40,17 +40,17 @@ const updateAllRates = async (req, res) => {
             const sell = parseFloat(rate.sell_rate);
             
             if (isNaN(buy) || isNaN(sell)) {
-                throw new Error(`Valor numérico inválido para el par ${rate.base_currency}-${rate.target_currency}`);
+                throw new Error(`Valor numérico inválido para el par ${rate.from_currency}-${rate.to_currency}`);
             }
 
-            // Consulta de actualización: Asume que tienes un registro único por par de divisas (base_currency, target_currency)
+            // Consulta de actualización: Asume que tienes un registro único por par de divisas (from_currency, to_currency)
             const updateQuery = `
                 UPDATE exchange_rates
                 SET buy_rate = ?, sell_rate = ?, updated_at = NOW()
-                WHERE base_currency = ? AND target_currency = ?;
+                WHERE from_currency = ? AND to_currency = ?;
             `;
             
-            return pool.execute(updateQuery, [buy, sell, rate.base_currency, rate.target_currency]);
+            return pool.execute(updateQuery, [buy, sell, rate.from_currency, rate.to_currency]);
         });
 
         // Ejecutar todas las actualizaciones de forma concurrente
