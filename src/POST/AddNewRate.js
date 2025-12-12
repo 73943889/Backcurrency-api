@@ -1,4 +1,4 @@
-const pool = require('../db'); 
+const pool = require('../db');
 
 /**
  * Obtiene todas las tasas de cambio desde la base de datos.
@@ -6,8 +6,9 @@ const pool = require('../db');
  */
 const getAllRates = async (req, res) => {
     try {
-        // 🛑 CORRECCIÓN CLAVE: Usamos AS (Alias) para renombrar los campos de la DB 
-        // y que el frontend los reciba como 'base_currency' y 'target_currency'.
+        // 🛑 SOLUCIÓN CLAVE: Usamos AS (Alias) para renombrar los campos REALES de tu DB 
+        // ('from_currency' y 'to_currency') y que el frontend los reciba como 
+        // 'base_currency' y 'target_currency', que es lo que espera para mapear los campos.
         const sqlQuery = `
             SELECT 
                 from_currency AS base_currency, 
@@ -21,7 +22,8 @@ const getAllRates = async (req, res) => {
         
         res.status(200).json({ 
             success: true, 
-            // Ahora 'rows' contendrá objetos con: {base_currency, target_currency, buy_rate, sell_rate}
+            // La respuesta ahora contiene los nombres que necesita el JavaScript del frontend:
+            // { base_currency: 'USD', target_currency: 'PEN', ... }
             rates: rows 
         });
 
@@ -39,7 +41,8 @@ const getAllRates = async (req, res) => {
  * Maneja POST /api/admin/rates/update-all
  */
 const updateAllRates = async (req, res) => {
-    // 🛑 CAMBIO EN PAYLOAD: Asumimos que el frontend envía los campos con los nombres que recibe (base_currency, target_currency)
+    // El frontend (después de recibir el GET) enviará los datos con los nombres:
+    // { rates: [ {base_currency: 'USD', target_currency: 'PEN', buy_rate: ..., sell_rate: ...}, ... ] }
     const { rates } = req.body; 
 
     if (!rates || !Array.isArray(rates) || rates.length === 0) {
@@ -51,23 +54,23 @@ const updateAllRates = async (req, res) => {
             const buy = parseFloat(rate.buy_rate);
             const sell = parseFloat(rate.sell_rate);
             
-            // Asumiendo que el frontend envía base_currency y target_currency (que es lo que recibe en el GET)
-            const base = rate.base_currency || rate.from_currency; 
-            const target = rate.target_currency || rate.to_currency;
+            // Los valores reales de las monedas ('USD', 'PEN') vienen en los campos base_currency y target_currency del payload
+            const baseValue = rate.base_currency; 
+            const targetValue = rate.target_currency;
 
-            if (isNaN(buy) || isNaN(sell) || !base || !target) {
-                 throw new Error(`Valor numérico o moneda inválida para el par.`);
+            if (isNaN(buy) || isNaN(sell) || !baseValue || !targetValue) {
+                 throw new Error(`Valor numérico o moneda inválida.`);
             }
 
-            // En el UPDATE, usamos los nombres REALES de la DB (from_currency, to_currency)
+            // En el UPDATE, usamos los nombres REALES de las columnas de tu DB (from_currency, to_currency)
             const updateQuery = `
                 UPDATE exchange_rates
                 SET buy_rate = ?, sell_rate = ?, updated_at = NOW()
                 WHERE from_currency = ? AND to_currency = ?;
             `;
             
-            // Pasamos los valores: [buy, sell, base_value, target_value]
-            return pool.execute(updateQuery, [buy, sell, base, target]);
+            // Pasamos los valores en el orden: [buy, sell, baseValue, targetValue]
+            return pool.execute(updateQuery, [buy, sell, baseValue, targetValue]);
         });
 
         await Promise.all(updates);
