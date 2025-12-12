@@ -1,35 +1,47 @@
-const tokenStore = new Map(); // token => expirationTime (en ms desde epoch)
+const jwt = require('jsonwebtoken');
+// Asumo que tienes el JWT_SECRET disponible aquí o lo importas desde tu .env/config
+const JWT_SECRET = process.env.JWT_SECRET; 
 
-const EXPIRATION_MINUTES = 720;
+// Ya no necesitamos tokenStore, EXPIRATION_MINUTES ni addToken.
 
 function authMiddleware(req, res, next) {
-  const apiKey = req.header('x-api-key');
-  if (!apiKey) {
-    return res.status(401).json({ message: 'Falta el API Key' });
-  }
+    // 1. Obtener y verificar el encabezado Authorization
+    const authHeader = req.header('Authorization');
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        return res.status(401).json({ message: 'Se requiere token. Use "Authorization: Bearer [token]"' });
+    }
+    
+    const token = authHeader.split(' ')[1]; 
 
-  const expiration = tokenStore.get(apiKey);
-
-  if (!expiration) {
-    return res.status(403).json({ message: 'API Key inválido' });
-  }
-
-  const now = Date.now();
-  if (now > expiration) {
-    tokenStore.delete(apiKey); // Eliminar token expirado
-    return res.status(403).json({ message: 'Token expirado, inicia sesión nuevamente' });
-  }
-
-  next();
+    try {
+        // 2. Verificar el token JWT
+        // Esta función automáticamente:
+        // a) Verifica la firma (que no haya sido alterado).
+        // b) Verifica la expiración (claim 'exp' del token).
+        const decoded = jwt.verify(token, JWT_SECRET); 
+        
+        // Opcional: Verificar el rol si solo quieres que pase un 'admin'
+        if (decoded.role !== 'admin') {
+             return res.status(403).json({ message: 'Acceso denegado: Se requiere rol de administrador.' });
+        }
+        
+        // 3. Si es válido, adjuntar el payload decodificado al request
+        req.admin = decoded; // Puedes acceder a req.admin.id o req.admin.role después
+        
+        next();
+        
+    } catch (err) {
+        // 4. Manejo de errores de JWT (firma inválida, token expirado, etc.)
+        if (err.name === 'TokenExpiredError') {
+            return res.status(403).json({ message: 'Token expirado, inicia sesión nuevamente.' });
+        }
+        
+        return res.status(403).json({ message: 'Token inválido o firma incorrecta.' });
+    }
 }
 
-// Para registrar un nuevo token con expiración
-function addToken(token) {
-  const expiresAt = Date.now() + EXPIRATION_MINUTES * 60 * 1000;
-  tokenStore.set(token, expiresAt);
-}
-
+// Ya no exportamos addToken, solo authMiddleware
 module.exports = {
-  authMiddleware,
-  addToken,
+    authMiddleware
 };
