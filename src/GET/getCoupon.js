@@ -10,45 +10,111 @@ const db = require('../db');
  * Obtiene todos los cupones de la base de datos para el panel de administración.
  * @route GET /api/admin/coupons
  */
-exports.getAllCoupons = async (req, res) => {
-    try {
-        // 🚀 CORRECCIÓN CLAVE: Usamos un LEFT JOIN para obtener el email.
-        const sql = `
-            SELECT 
-                c.id, 
-                c.user_id, 
-                c.codigo, 
-                c.descuento, 
-                c.expiracion, 
-                c.usos_maximos, 
-                c.usos_actuales, 
-                c.usado, 
-                c.creado_en,
-                c.inhabilitado,         -- Aseguramos incluir el campo inhabilitado
-                u.email AS user_email   -- ⭐️ Traemos el email del usuario y lo renombramos
-            FROM 
-                cupones c
-            LEFT JOIN 
-                users u ON c.user_id = u.id -- Unimos 'cupones' con 'users' usando el user_id
-            ORDER BY 
-                c.creado_en DESC
-        `;
-        
-        const [coupons] = await db.execute(sql);
+async function fetchAndRenderCoupons() {
+    const tableBody = document.getElementById('coupon-table-body');
+    const statusElement = document.getElementById('coupons-list-status'); // Asegúrate de que exista en el HTML
 
-        return res.json({
-            success: true,
-            coupons: coupons
+    tableBody.innerHTML = '<tr><td colspan="8">Cargando cupones...</td></tr>'; // Cambié colspan a 8
+
+    try {
+        // CORRECCIÓN RUTA: Se usa la ruta que enviaste en el primer mensaje
+        const response = await fetch(`${API_BASE_URL}/api/admin/coupon/all`, { 
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${adminToken}` }
         });
+
+        const data = await response.json();
+
+        if (data.success && data.coupons) {
+            tableBody.innerHTML = ''; // Limpiar
+            
+            // Creación de encabezado (Revisada para asegurar 8 columnas)
+            const table = document.getElementById('coupons-table');
+            if (table.querySelector('thead') === null) {
+                table.innerHTML = `
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Código</th>
+                            <th>Descuento</th>
+                            <th>Usuario Asignado</th> 
+                            <th>Usos (Actual/Máx)</th>
+                            <th>Expira</th>
+                            <th>Estado</th>
+                            <th>Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="coupon-table-body"></tbody>
+                `;
+            }
+            
+            const tbody = document.getElementById('coupon-table-body');
+
+            data.coupons.forEach(coupon => {
+                const row = tbody.insertRow();
+                
+                // Columna 0: ID
+                row.insertCell(0).textContent = coupon.id;
+                // Columna 1: Código
+                row.insertCell(1).textContent = coupon.codigo;
+                // Columna 2: Descuento
+                row.insertCell(2).textContent = `${(parseFloat(coupon.descuento) * 100).toFixed(2)}%`; 
+                
+                // ⭐️ CORRECCIÓN CLAVE 1: Insertar la celda del usuario en el índice 3
+                const userDisplay = coupon.user_email || `<span class="badge badge-primary">Genérico</span>`;
+                const userCell = row.insertCell(3);
+                userCell.innerHTML = userDisplay;
+                
+                // Columna 4: Usos (anteriormente índice 3)
+                const usesCell = row.insertCell(4);
+                usesCell.textContent = `${coupon.usos_actuales || 0} / ${coupon.usos_maximos || '∞'}`;
+
+                // Columna 5: Expira (anteriormente índice 4)
+                row.insertCell(5).textContent = coupon.expiracion ? new Date(coupon.expiracion).toLocaleDateString() : 'Nunca';
+                
+                // Determinar el estado visual
+                const estado = coupon.usado ? 'USADO' : 
+                               (coupon.inhabilitado == 1) ? 'INHABILITADO' :
+                               (coupon.usos_maximos !== null && coupon.usos_actuales >= coupon.usos_maximos) ? 'AGOTADO' :
+                               (coupon.expiracion && new Date(coupon.expiracion) < new Date()) ? 'EXPIRADO' : 'ACTIVO';
+                
+                // Columna 6: Estado (anteriormente índice 5)
+                const statusCell = row.insertCell(6);
+                statusCell.textContent = estado;
+                statusCell.className = `status-${estado.toLowerCase()}`;
+                
+                // Columna 7: Acción (anteriormente índice 6)
+                // Se agregó la lógica de asignación/desasignación, asumiendo que existen esas funciones
+                const actionButton = coupon.user_id 
+                    ? `<button onclick="unassignCoupon(${coupon.id})" class="button-danger button-small">Desasignar</button>`
+                    : `<button onclick="openAssignUserModal(${coupon.id}, '${coupon.codigo}')" class="button-secondary button-small">Asignar</button>`;
+                    
+                row.insertCell(7).innerHTML = actionButton + `<button onclick="deleteCoupon(${coupon.id})" style="margin-left: 5px;">Eliminar</button>`;
+            });
+            
+            if (statusElement) {
+                statusElement.textContent = `Lista de cupones cargada (${data.coupons.length}).`;
+                statusElement.className = 'success';
+            }
+
+
+        } else {
+            if (statusElement) {
+                statusElement.textContent = `Fallo al cargar cupones: ${data.message || 'Error desconocido'}`;
+                statusElement.className = 'error';
+            }
+            tableBody.innerHTML = `<tr><td colspan="8" class="error">Fallo al cargar cupones: ${data.message || 'Error desconocido'}</td></tr>`;
+        }
 
     } catch (error) {
-        console.error("❌ Error al obtener cupones:", error.message);
-        return res.status(500).json({
-            success: false,
-            message: "Error interno al obtener la lista de cupones."
-        });
+        if (statusElement) {
+            statusElement.textContent = 'Error de red al cargar cupones.';
+            statusElement.className = 'error';
+        }
+        tableBody.innerHTML = '<tr><td colspan="8" class="error">Error de red al cargar cupones.</td></tr>';
+        console.error('Error al cargar cupones:', error);
     }
-};
+}
 
 /**
  * Crea un cupón nuevo en la base de datos (Instancia manual o específica).
@@ -373,6 +439,83 @@ exports.assignCouponToUser = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: errorMessage
+        });
+    }
+};
+
+
+/**
+ * Habilita o inhabilita un cupón específico (Instancia).
+ * @route POST /api/admin/coupon/toggle-inhabilitado
+ */
+exports.toggleCouponInhabilitado = async (req, res) => {
+    try {
+        const { id, inhabilitado } = req.body; // 'inhabilitado' debe ser 1 (true) o 0 (false)
+
+        if (!id || inhabilitado === undefined) {
+            return res.status(400).json({ success: false, message: "ID y el estado 'inhabilitado' son obligatorios." });
+        }
+
+        // 1. Verificar si el cupón existe (opcional, pero recomendable)
+        const [existing] = await db.execute('SELECT id FROM cupones WHERE id = ?', [id]);
+        if (existing.length === 0) {
+            return res.status(404).json({ success: false, message: "Cupón no encontrado." });
+        }
+
+        // 2. Realizar la actualización en la base de datos
+        const sql = `UPDATE cupones SET inhabilitado = ? WHERE id = ?`;
+        
+        // El valor se pasa directamente, ya que debería ser 0 o 1
+        const [result] = await db.execute(sql, [inhabilitado, id]); 
+
+        const newState = inhabilitado == 1 ? 'inhabilitado' : 'habilitado';
+        
+        return res.json({
+            success: true,
+            message: `Cupón ID ${id} actualizado. Estado: ${newState}.`
+        });
+
+    } catch (error) {
+        console.error("❌ Error al cambiar estado de inhabilitación:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno del servidor al cambiar el estado del cupón."
+        });
+    }
+};
+// =========================================================
+// A) GESTIÓN DE INSTANCIAS DE CUPONES (Tabla: cupones)
+// =========================================================
+
+/**
+ * Obtiene todos los cupones de la base de datos para el panel de administración.
+ * @route GET /api/admin/coupons
+ */
+exports.getAllCoupons = async (req, res) => {
+    try {
+        // Consulta SQL con LEFT JOIN para obtener el email del usuario asignado
+        const sql = `
+            SELECT 
+                c.*, 
+                u.email AS user_email
+            FROM 
+                cupones c
+            LEFT JOIN 
+                users u ON c.user_id = u.id
+            ORDER BY 
+                c.id DESC
+        `;
+        const [coupons] = await db.execute(sql);
+
+        return res.json({
+            success: true,
+            coupons: coupons
+        });
+    } catch (error) {
+        console.error("❌ Error al obtener cupones:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno del servidor al obtener la lista de cupones."
         });
     }
 };
