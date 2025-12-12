@@ -1,6 +1,10 @@
-// src/GET/getCoupon.js
+// src/controllers/CouponController.js
 // Asume que tienes un archivo db.js o una función de conexión a la base de datos.
-const db = require('../db'); // Cambia esto según tu estructura de DB
+const db = require('../db'); 
+
+// =========================================================
+// A) GESTIÓN DE INSTANCIAS DE CUPONES (Tabla: cupones)
+// =========================================================
 
 /**
  * Obtiene todos los cupones de la base de datos para el panel de administración.
@@ -28,7 +32,7 @@ exports.getAllCoupons = async (req, res) => {
 };
 
 /**
- * Crea un cupón nuevo en la base de datos.
+ * Crea un cupón nuevo en la base de datos (Instancia manual o específica).
  * @route POST /api/admin/coupon/create
  */
 exports.createCoupon = async (req, res) => {
@@ -39,33 +43,37 @@ exports.createCoupon = async (req, res) => {
             descuento, 
             expiracion, 
             usos_maximos, 
-            tipo_expiracion // 'tiempo', 'uso' o null
+            tipo_expiracion 
         } = req.body;
 
         if (!codigo || descuento === undefined) {
             return res.status(400).json({ success: false, message: "Código y Descuento son obligatorios." });
         }
         
-        // 1. Validar unicidad del código (opcional, pero buena práctica)
+        // Validar unicidad del código
         const [existing] = await db.execute('SELECT id FROM cupones WHERE codigo = ?', [codigo]);
         if (existing.length > 0) {
             return res.status(409).json({ success: false, message: "El código de cupón ya existe." });
         }
+        
+        // Manejo de NULLs para user_id (ya que ahora permite NULL) y otros campos
+        const finalUserId = (user_id && user_id > 0) ? user_id : null; 
+        const finalExpiracion = expiracion || null;
+        const finalUsosMaximos = usos_maximos || null;
+        const finalTipoExpiracion = tipo_expiracion || 'manual'; // Default a 'manual'
 
-        // 2. Construir la consulta SQL
         const sql = `INSERT INTO cupones (user_id, codigo, descuento, expiracion, usos_maximos, tipo_expiracion) 
                      VALUES (?, ?, ?, ?, ?, ?)`;
         
         const values = [
-            user_id || null, // Si es null o vacío, inserta NULL
+            finalUserId, 
             codigo,
             descuento,
-            expiracion || null,
-            usos_maximos || null,
-            tipo_expiracion || null
+            finalExpiracion,
+            finalUsosMaximos,
+            finalTipoExpiracion
         ];
 
-        // 3. Ejecutar la inserción
         const [result] = await db.execute(sql, values);
 
         return res.status(201).json({
@@ -76,10 +84,147 @@ exports.createCoupon = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error al crear cupón:", error);
-        // Error de SQL (ej. violación de FOREIGN KEY o tipo de dato)
+        // Error de SQL (ej. violación de FOREIGN KEY por user_id, ahora solo si el ID no existe)
         return res.status(500).json({
             success: false,
-            message: "Error interno del servidor al crear el cupón."
+            message: "Error interno del servidor al crear el cupón. Revise si el ID de usuario existe."
+        });
+    }
+};
+
+
+// =========================================================
+// B) GESTIÓN DE CONFIGURACIÓN MAESTRA (Tabla: config_cupones)
+// =========================================================
+
+/**
+ * Obtiene la configuración global de cupones (asumiendo id=1).
+ * @route GET /api/admin/coupon-config
+ */
+exports.getCouponConfig = async (req, res) => {
+    try {
+        const sql = `SELECT * FROM config_cupones WHERE id = 1`;
+        const [config] = await db.execute(sql); 
+
+        return res.json({
+            success: true,
+            // Devuelve la primera fila o null si la tabla está vacía
+            config: config.length > 0 ? config[0] : null
+        });
+
+    } catch (error) {
+        console.error("❌ Error al obtener configuración de cupones:", error.message);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno al obtener la configuración de cupones."
+        });
+    }
+};
+
+/**
+ * Actualiza o inserta (UPSERT) la configuración global de cupones (id=1).
+ * Incluye validación de coherencia estricta.
+ * @route POST /api/admin/coupon-config/update
+ */
+exports.updateCouponConfig = async (req, res) => {
+    try {
+        const {
+            activa,
+            descuento,
+            tipo_expiracion,
+            duracion_valor,
+            duracion_unidad,
+            usos_maximos,
+            descripcion
+        } = req.body;
+        
+        // 1. Validar campos obligatorios
+        if (descuento === undefined || !tipo_expiracion) {
+            return res.status(400).json({ success: false, message: "Descuento y Tipo de expiración son obligatorios." });
+        }
+        
+        // 🚀 LÓGICA DE VALIDACIÓN DE COHERENCIA (Protección del backend)
+        let finalDuracionValor = duracion_valor || null;
+        let finalDuracionUnidad = duracion_unidad || null;
+        let finalUsosMaximos = usos_maximos || null;
+
+        // a) Validar Expiración por Tiempo
+        if (tipo_expiracion === 'tiempo' || tipo_expiracion === 'ambos') {
+            if (!duracion_valor || duracion_valor <= 0 || !duracion_unidad) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Si la expiración incluye 'tiempo', 'duracion_valor' y 'duracion_unidad' son obligatorios." 
+                });
+            }
+        } else {
+            // Si es solo 'uso', forzar los campos de tiempo a NULL para la BD
+            finalDuracionValor = null;
+            finalDuracionUnidad = null;
+        }
+
+        // b) Validar Expiración por Uso
+        if (tipo_expiracion === 'uso' || tipo_expiracion === 'ambos') {
+            if (!usos_maximos || usos_maximos <= 0) {
+                return res.status(400).json({ 
+                    success: false, 
+                    message: "Si la expiración incluye 'uso', 'usos_maximos' es obligatorio y debe ser mayor que cero." 
+                });
+            }
+        } else {
+            // Si es solo 'tiempo', forzar el campo de usos a NULL para la BD
+            finalUsosMaximos = null;
+        }
+
+        // 2. Intentar actualizar (asumiendo que id=1)
+        const updateSql = `
+            UPDATE config_cupones 
+            SET activa = ?, tipo_expiracion = ?, duracion_valor = ?, 
+                duracion_unidad = ?, usos_maximos = ?, descuento = ?, descripcion = ? 
+            WHERE id = 1
+        `;
+        
+        const updateValues = [
+            activa,
+            tipo_expiracion,
+            finalDuracionValor,
+            finalDuracionUnidad,
+            finalUsosMaximos,
+            descuento,
+            descripcion || null
+        ];
+
+        const [updateResult] = await db.execute(updateSql, updateValues);
+        
+        // 3. Si no se actualizó ninguna fila (no existe, debe insertarse)
+        if (updateResult.affectedRows === 0) {
+            const insertSql = `
+                INSERT INTO config_cupones (id, activa, tipo_expiracion, duracion_valor, duracion_unidad, usos_maximos, descuento, descripcion)
+                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+            `;
+            
+            const insertValues = [
+                activa,
+                tipo_expiracion,
+                finalDuracionValor,
+                finalDuracionUnidad,
+                finalUsosMaximos,
+                descuento,
+                descripcion || null
+            ];
+            
+            await db.execute(insertSql, insertValues);
+        }
+
+        return res.json({
+            success: true,
+            message: "Configuración guardada exitosamente."
+        });
+
+    } catch (error) {
+        console.error("❌ Error al guardar configuración de cupones:", error);
+        return res.status(500).json({
+            success: false,
+            message: `Error interno al guardar la configuración: ${error.message}`
         });
     }
 };

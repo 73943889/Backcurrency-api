@@ -25,4 +25,8 @@ router.post('/rates/update-all', authAdmin, RateController.updateAllRates);
 router.get('/coupons', authAdmin, CouponController.getAllCoupons);
 router.post('/coupon/create', authAdmin, CouponController.createCoupon);
 
+// 🚀 GESTIÓN DE CONFIGURACIÓN MAESTRA DE CUPONES (NUEVAS RUTAS)
+router.get('/coupon-config', authAdmin, CouponController.getCouponConfig);
+router.post('/coupon-config/update', authAdmin, CouponController.updateCouponConfig);
+
 module.exports = router;
