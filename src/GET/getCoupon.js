@@ -12,8 +12,27 @@ const db = require('../db');
  */
 exports.getAllCoupons = async (req, res) => {
     try {
-        const sql = `SELECT id, user_id, codigo, descuento, expiracion, usos_maximos, usos_actuales, usado, creado_en 
-                     FROM cupones ORDER BY creado_en DESC`;
+        // 🚀 CORRECCIÓN CLAVE: Usamos un LEFT JOIN para obtener el email.
+        const sql = `
+            SELECT 
+                c.id, 
+                c.user_id, 
+                c.codigo, 
+                c.descuento, 
+                c.expiracion, 
+                c.usos_maximos, 
+                c.usos_actuales, 
+                c.usado, 
+                c.creado_en,
+                c.inhabilitado,         -- Aseguramos incluir el campo inhabilitado
+                u.email AS user_email   -- ⭐️ Traemos el email del usuario y lo renombramos
+            FROM 
+                cupones c
+            LEFT JOIN 
+                users u ON c.user_id = u.id -- Unimos 'cupones' con 'users' usando el user_id
+            ORDER BY 
+                c.creado_en DESC
+        `;
         
         const [coupons] = await db.execute(sql);
 
