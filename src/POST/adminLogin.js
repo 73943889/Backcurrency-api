@@ -2,7 +2,7 @@
 
 const jwt = require('jsonwebtoken');
 const JWT_SECRET = process.env.JWT_SECRET;
-const TOKEN_DURATION = '1m';
+const TOKEN_DURATION = '30m';
 const adminLoginHandler = (req, res) => {
     const { username, password } = req.body;
 
