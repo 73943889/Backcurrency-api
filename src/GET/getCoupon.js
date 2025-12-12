@@ -226,5 +226,65 @@ exports.updateCouponConfig = async (req, res) => {
             success: false,
             message: `Error interno al guardar la configuración: ${error.message}`
         });
+    
+	/**
+ * Activa una regla específica (ID) y desactiva todas las demás.
+ * @route POST /api/admin/coupon-config/toggle
+ */
+	exports.toggleRuleStatus = async (req, res) => {
+    let connection;
+    try {
+        const { id, activa } = req.body;
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: "El ID de la regla es obligatorio." });
+        }
+        
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // Si se pide activar, aseguramos que solo esa sea TRUE
+        if (activa === true || activa === 1) {
+            // 1. Desactivar todas las reglas existentes
+            const deactivateSql = `UPDATE config_cupones SET activa = FALSE`;
+            await connection.execute(deactivateSql);
+
+            // 2. Activar solo la regla con el ID proporcionado
+            const activateSql = `UPDATE config_cupones SET activa = TRUE WHERE id = ?`;
+            const [result] = await connection.execute(activateSql, [id]);
+
+            if (result.affectedRows === 0) {
+                // Si no se encontró el ID, hacemos rollback para no dejar la tabla vacía.
+                await connection.rollback();
+                return res.status(404).json({ success: false, message: `No se encontró la regla con ID ${id}.` });
+            }
+            
+            await connection.commit();
+            return res.json({ success: true, message: `Regla ID ${id} activada exitosamente. Todas las demás han sido desactivadas.` });
+
+        } else {
+            // Si se pide desactivar, simplemente la desactivamos.
+            const deactivateOneSql = `UPDATE config_cupones SET activa = FALSE WHERE id = ?`;
+            await connection.execute(deactivateOneSql, [id]);
+            await connection.commit();
+            return res.json({ success: true, message: `Regla ID ${id} desactivada exitosamente.` });
+        }
+
+    } catch (error) {
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error("❌ Error en toggleRuleStatus:", error);
+        return res.status(500).json({ 
+            success: false, 
+            message: `Error interno al cambiar el estado de la regla: ${error.sqlMessage || error.message}`
+        });
+    } finally {
+        if (connection) {
+            connection.release();
+        }
     }
+};
+	
+	
 };

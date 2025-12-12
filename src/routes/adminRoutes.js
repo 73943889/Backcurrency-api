@@ -28,5 +28,5 @@ router.post('/coupon/create', authAdmin, CouponController.createCoupon);
 // 🚀 GESTIÓN DE CONFIGURACIÓN MAESTRA DE CUPONES (NUEVAS RUTAS)
 router.get('/coupon-config', authAdmin, CouponController.getCouponConfig);
 router.post('/coupon-config/update', authAdmin, CouponController.updateCouponConfig);
-
+router.post('/coupon-config/toggle', authAdmin, CouponController.toggleRuleStatus); // (Para activar/desactivar y asegurar exclusividad)
 module.exports = router;
