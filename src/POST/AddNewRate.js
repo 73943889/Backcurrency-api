@@ -11,8 +11,8 @@ const getAllRates = async (req, res) => {
         // 'base_currency' y 'target_currency', que es lo que espera para mapear los campos.
         const sqlQuery = `
             SELECT 
-                from_currency AS base_currency, 
-                to_currency AS target_currency, 
+                from_currency AS from_currency, 
+                to_currency AS to_currency, 
                 buy_rate, 
                 sell_rate 
             FROM 
@@ -55,8 +55,8 @@ const updateAllRates = async (req, res) => {
             const sell = parseFloat(rate.sell_rate);
             
             // Los valores reales de las monedas ('USD', 'PEN') vienen en los campos base_currency y target_currency del payload
-            const baseValue = rate.base_currency; 
-            const targetValue = rate.target_currency;
+            const baseValue = rate.from_currency; 
+            const targetValue = rate.to_currency;
 
             if (isNaN(buy) || isNaN(sell) || !baseValue || !targetValue) {
                  throw new Error(`Valor numérico o moneda inválida.`);
