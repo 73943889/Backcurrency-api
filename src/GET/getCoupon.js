@@ -33,6 +33,7 @@ exports.getAllCoupons = async (req, res) => {
 
 /**
  * Crea un cupón nuevo en la base de datos (Instancia manual o específica).
+ * Incluye logging detallado para errores de BD (ej. Foreign Key).
  * @route POST /api/admin/coupon/create
  */
 exports.createCoupon = async (req, res) => {
@@ -50,17 +51,17 @@ exports.createCoupon = async (req, res) => {
             return res.status(400).json({ success: false, message: "Código y Descuento son obligatorios." });
         }
         
-        // Validar unicidad del código
+        // Validar unicidad del código (Error de negocio 409)
         const [existing] = await db.execute('SELECT id FROM cupones WHERE codigo = ?', [codigo]);
         if (existing.length > 0) {
             return res.status(409).json({ success: false, message: "El código de cupón ya existe." });
         }
         
-        // Manejo de NULLs para user_id (ya que ahora permite NULL) y otros campos
+        // Manejo de NULLs
         const finalUserId = (user_id && user_id > 0) ? user_id : null; 
         const finalExpiracion = expiracion || null;
         const finalUsosMaximos = usos_maximos || null;
-        const finalTipoExpiracion = tipo_expiracion || 'manual'; // Default a 'manual'
+        const finalTipoExpiracion = tipo_expiracion || 'manual';
 
         const sql = `INSERT INTO cupones (user_id, codigo, descuento, expiracion, usos_maximos, tipo_expiracion) 
                      VALUES (?, ?, ?, ?, ?, ?)`;
@@ -84,36 +85,41 @@ exports.createCoupon = async (req, res) => {
 
     } catch (error) {
         console.error("❌ Error al crear cupón:", error);
-        // Error de SQL (ej. violación de FOREIGN KEY por user_id, ahora solo si el ID no existe)
+        
+        let errorMessage = "Error interno del servidor al crear el cupón.";
+        if (error.sqlMessage) {
+             errorMessage = `Error de Base de Datos: ${error.sqlMessage}. Revise si el ID de usuario existe.`;
+        }
+
+        // Devolvemos el error de BD detallado
         return res.status(500).json({
             success: false,
-            message: "Error interno del servidor al crear el cupón. Revise si el ID de usuario existe."
+            message: errorMessage
         });
     }
 };
 
 
 // =========================================================
-// B) GESTIÓN DE CONFIGURACIÓN MAESTRA (Tabla: config_cupones)
+// B) GESTIÓN DE CONFIGURACIÓN MAESTRA (Tabla: config_cupones - N Reglas)
 // =========================================================
 
 /**
- * Obtiene la configuración global de cupones (asumiendo id=1).
+ * Obtiene TODAS las configuraciones de cupones de la base de datos (N Reglas).
  * @route GET /api/admin/coupon-config
  */
 exports.getCouponConfig = async (req, res) => {
     try {
-        const sql = `SELECT * FROM config_cupones WHERE id = 1`;
-        const [config] = await db.execute(sql); 
+        const sql = `SELECT * FROM config_cupones ORDER BY id ASC`;
+        const [configurations] = await db.execute(sql); 
 
         return res.json({
             success: true,
-            // Devuelve la primera fila o null si la tabla está vacía
-            config: config.length > 0 ? config[0] : null
+            configurations: configurations // Devuelve el listado completo
         });
 
     } catch (error) {
-        console.error("❌ Error al obtener configuración de cupones:", error.message);
+        console.error("❌ Error al obtener configuraciones de cupones:", error.message);
         return res.status(500).json({
             success: false,
             message: "Error interno al obtener la configuración de cupones."
@@ -122,13 +128,14 @@ exports.getCouponConfig = async (req, res) => {
 };
 
 /**
- * Actualiza o inserta (UPSERT) la configuración global de cupones (id=1).
+ * Actualiza una regla existente o inserta una nueva. (N-rules model)
  * Incluye validación de coherencia estricta.
  * @route POST /api/admin/coupon-config/update
  */
 exports.updateCouponConfig = async (req, res) => {
     try {
         const {
+            id, // ID para UPDATE o NULL para INSERT
             activa,
             descuento,
             tipo_expiracion,
@@ -143,12 +150,11 @@ exports.updateCouponConfig = async (req, res) => {
             return res.status(400).json({ success: false, message: "Descuento y Tipo de expiración son obligatorios." });
         }
         
-        // 🚀 LÓGICA DE VALIDACIÓN DE COHERENCIA (Protección del backend)
+        // 2. LÓGICA DE VALIDACIÓN DE COHERENCIA (Mantenida)
         let finalDuracionValor = duracion_valor || null;
         let finalDuracionUnidad = duracion_unidad || null;
         let finalUsosMaximos = usos_maximos || null;
 
-        // a) Validar Expiración por Tiempo
         if (tipo_expiracion === 'tiempo' || tipo_expiracion === 'ambos') {
             if (!duracion_valor || duracion_valor <= 0 || !duracion_unidad) {
                 return res.status(400).json({ 
@@ -157,12 +163,10 @@ exports.updateCouponConfig = async (req, res) => {
                 });
             }
         } else {
-            // Si es solo 'uso', forzar los campos de tiempo a NULL para la BD
             finalDuracionValor = null;
             finalDuracionUnidad = null;
         }
 
-        // b) Validar Expiración por Uso
         if (tipo_expiracion === 'uso' || tipo_expiracion === 'ambos') {
             if (!usos_maximos || usos_maximos <= 0) {
                 return res.status(400).json({ 
@@ -171,35 +175,42 @@ exports.updateCouponConfig = async (req, res) => {
                 });
             }
         } else {
-            // Si es solo 'tiempo', forzar el campo de usos a NULL para la BD
             finalUsosMaximos = null;
         }
 
-        // 2. Intentar actualizar (asumiendo que id=1)
-        const updateSql = `
-            UPDATE config_cupones 
-            SET activa = ?, tipo_expiracion = ?, duracion_valor = ?, 
-                duracion_unidad = ?, usos_maximos = ?, descuento = ?, descripcion = ? 
-            WHERE id = 1
-        `;
-        
-        const updateValues = [
-            activa,
-            tipo_expiracion,
-            finalDuracionValor,
-            finalDuracionUnidad,
-            finalUsosMaximos,
-            descuento,
-            descripcion || null
-        ];
+        // 3. UPSERT LÓGICO
+        if (id) {
+            // UPDATE
+            const updateSql = `
+                UPDATE config_cupones 
+                SET activa = ?, tipo_expiracion = ?, duracion_valor = ?, 
+                    duracion_unidad = ?, usos_maximos = ?, descuento = ?, descripcion = ? 
+                WHERE id = ?
+            `;
+            
+            const updateValues = [
+                activa,
+                tipo_expiracion,
+                finalDuracionValor,
+                finalDuracionUnidad,
+                finalUsosMaximos,
+                descuento,
+                descripcion || null,
+                id
+            ];
 
-        const [updateResult] = await db.execute(updateSql, updateValues);
-        
-        // 3. Si no se actualizó ninguna fila (no existe, debe insertarse)
-        if (updateResult.affectedRows === 0) {
+            await db.execute(updateSql, updateValues);
+            
+            return res.json({
+                success: true,
+                message: `Regla ID ${id} actualizada exitosamente.`
+            });
+
+        } else {
+            // INSERT (Crear nueva regla)
             const insertSql = `
-                INSERT INTO config_cupones (id, activa, tipo_expiracion, duracion_valor, duracion_unidad, usos_maximos, descuento, descripcion)
-                VALUES (1, ?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO config_cupones (activa, tipo_expiracion, duracion_valor, duracion_unidad, usos_maximos, descuento, descripcion)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
             `;
             
             const insertValues = [
@@ -212,26 +223,35 @@ exports.updateCouponConfig = async (req, res) => {
                 descripcion || null
             ];
             
-            await db.execute(insertSql, insertValues);
+            const [insertResult] = await db.execute(insertSql, insertValues);
+            
+            return res.status(201).json({
+                success: true,
+                message: `Nueva Regla creada exitosamente con ID ${insertResult.insertId}.`
+            });
         }
-
-        return res.json({
-            success: true,
-            message: "Configuración guardada exitosamente."
-        });
 
     } catch (error) {
         console.error("❌ Error al guardar configuración de cupones:", error);
+        
+        let errorMessage = `Error interno al guardar la configuración: ${error.message}`;
+        if (error.sqlMessage) {
+             errorMessage = `Error de Base de Datos: ${error.sqlMessage}`;
+        }
+        
+        // Devolvemos el error de BD detallado
         return res.status(500).json({
             success: false,
-            message: `Error interno al guardar la configuración: ${error.message}`
+            message: errorMessage
         });
-    
-	/**
- * Activa una regla específica (ID) y desactiva todas las demás.
+    }
+}; // <--- SINTAXIS CORREGIDA
+
+/**
+ * Activa una regla específica (ID) y desactiva todas las demás (exclusividad).
  * @route POST /api/admin/coupon-config/toggle
  */
-	exports.toggleRuleStatus = async (req, res) => {
+exports.toggleRuleStatus = async (req, res) => {
     let connection;
     try {
         const { id, activa } = req.body;
@@ -254,7 +274,6 @@ exports.updateCouponConfig = async (req, res) => {
             const [result] = await connection.execute(activateSql, [id]);
 
             if (result.affectedRows === 0) {
-                // Si no se encontró el ID, hacemos rollback para no dejar la tabla vacía.
                 await connection.rollback();
                 return res.status(404).json({ success: false, message: `No se encontró la regla con ID ${id}.` });
             }
@@ -275,16 +294,19 @@ exports.updateCouponConfig = async (req, res) => {
             await connection.rollback();
         }
         console.error("❌ Error en toggleRuleStatus:", error);
+        
+        let errorMessage = `Error interno al cambiar el estado de la regla: ${error.message}`;
+        if (error.sqlMessage) {
+             errorMessage = `Error de Base de Datos: ${error.sqlMessage}`;
+        }
+        
         return res.status(500).json({ 
             success: false, 
-            message: `Error interno al cambiar el estado de la regla: ${error.sqlMessage || error.message}`
+            message: errorMessage
         });
     } finally {
         if (connection) {
             connection.release();
         }
     }
-};
-	
-	
-};
+}; // <--- SINTAXIS CORREGIDA
