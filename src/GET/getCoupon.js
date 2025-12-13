@@ -417,7 +417,7 @@ exports.toggleCouponInhabilitado = async (req, res) => {
  * Obtiene los cupones de la base de datos CON PAGINACIÓN para el panel de administración.
  * @route GET /api/admin/coupons?limit=10&offset=0
  */
-exports.getAllCoupons = async (req, res) => { // ¡Asegúrate de que 'async' esté aquí!
+exports.getAllCoupons = async (req, res) => { 
     try {
         // 1. Obtener y validar parámetros de paginación desde la URL (query)
         const limit = parseInt(req.query.limit) || 10;
@@ -425,8 +425,8 @@ exports.getAllCoupons = async (req, res) => { // ¡Asegúrate de que 'async' est
         
         // 2. Consulta A: Obtener el TOTAL de registros 
         const countSql = `SELECT COUNT(c.id) AS total FROM cupones c`;
-        const [countResult] = await db.execute(countSql); // await es válido gracias a 'async'
-        const totalRecords = countResult[0].total; // Total de cupones en la BD
+        const [countResult] = await db.execute(countSql);
+        const totalRecords = countResult[0].total; 
 
         // 3. Consulta B: Obtener los cupones para la página actual
         const couponsSql = `
@@ -442,7 +442,11 @@ exports.getAllCoupons = async (req, res) => { // ¡Asegúrate de que 'async' est
             LIMIT ? OFFSET ?
         `;
         
-        // ⚠️ CORRECCIÓN: Usamos Number() para evitar el error de MySQL y forzar el tipo.
+        // 🔎 LÍNEAS DE DEBUG AÑADIDAS: Verifica qué valores estamos pasando
+        console.log(`DEBUG PAGINACION -> Limit: ${limit} | Tipo: ${typeof limit}`);
+        console.log(`DEBUG PAGINACION -> Offset: ${offset} | Tipo: ${typeof offset}`);
+        
+        // ⚠️ CORRECCIÓN APLICADA: Forzamos el tipo Number.
         const [coupons] = await db.execute(couponsSql, [Number(limit), Number(offset)]);
 
         // 4. Devolver la respuesta
@@ -460,7 +464,6 @@ exports.getAllCoupons = async (req, res) => { // ¡Asegúrate de que 'async' est
         });
     }
 };
-
 /**
  * Obtiene los usuarios de la base de datos para mostrarlos en el modal de asignación.
  * @route GET /api/admin/users
