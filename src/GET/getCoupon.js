@@ -288,52 +288,88 @@ exports.toggleRuleStatus = async (req, res) => {
 
 /**
  * Asigna un cupón existente a un user_id específico.
+ * * IMPLEMENTACIÓN CORREGIDA: Antes de asignar, inhabilita 
+ * todos los demás cupones activos de ese usuario (Transacción).
  * @route POST /api/admin/coupon/assign
  */
 exports.assignCouponToUser = async (req, res) => {
+    let connection; // Variable para gestionar la conexión y transacción
     try {
-        // 🚨 CAMBIO AQUÍ: Asegúrate de que los nombres coincidan con el frontend (script.js)
-        const { coupon_id, user_id } = req.body; // El frontend envía 'coupon_id' y 'user_id'
+        const { coupon_id, user_id } = req.body;
 
         if (!coupon_id || !user_id) {
             return res.status(400).json({ success: false, message: "ID de cupón y ID de usuario son obligatorios." });
         }
 
-        // 1. Validar que el cupón exista
-        const [existing] = await db.execute('SELECT id, user_id FROM cupones WHERE id = ?', [coupon_id]);
+        // 1. Iniciar Transacción
+        connection = await db.getConnection();
+        await connection.beginTransaction();
+
+        // Opcional: Validar que el cupón a asignar exista.
+        const [existing] = await connection.execute('SELECT id FROM cupones WHERE id = ?', [coupon_id]);
         if (existing.length === 0) {
-            return res.status(404).json({ success: false, message: "Cupón no encontrado." });
+            await connection.rollback();
+            return res.status(404).json({ success: false, message: "Cupón a asignar no encontrado." });
         }
         
-        // 2. Realizar la asignación
-        const sql = `UPDATE cupones SET user_id = ? WHERE id = ?`;
-        const [result] = await db.execute(sql, [user_id, coupon_id]); // user_id se asigna al cupón
+        // 2. INHABILITAR CUPONES ANTERIORES: Desactivar todos los cupones previamente asignados al usuario,
+        // excluyendo el cupón que estamos a punto de asignar.
+        const deactivateSql = `
+            UPDATE cupones 
+            SET inhabilitado = 1 
+            WHERE user_id = ? 
+            AND id != ? 
+            AND inhabilitado = 0  
+        `;
+        // Ejecutamos la inhabilitación de los cupones antiguos
+        await connection.execute(deactivateSql, [user_id, coupon_id]); 
+        
+        
+        // 3. ASIGNAR EL NUEVO CUPÓN: Asignar el cupón y asegurarse de que esté HABILITADO (inhabilitado = 0).
+        const assignSql = `
+            UPDATE cupones 
+            SET user_id = ?, inhabilitado = 0 
+            WHERE id = ?
+        `;
+        const [result] = await connection.execute(assignSql, [user_id, coupon_id]);
 
         if (result.affectedRows === 0) {
-            // Esto sucede si el cupón ya estaba asignado a ese user_id. Lo consideramos éxito.
-            return res.json({ success: true, message: `Cupón ID ${coupon_id} ya estaba asignado al usuario ID ${user_id}.` });
+             // Si no se afectó ninguna fila, hacemos rollback.
+             await connection.rollback();
+             return res.status(500).json({ success: false, message: "Fallo al asignar el cupón (ID de cupón inválido o error en la transacción)." });
         }
+        
+        // 4. Finalizar Transacción
+        await connection.commit();
 
         return res.json({
             success: true,
-            message: `Cupón ID ${coupon_id} asignado con éxito al usuario ID ${user_id}.`
+            message: `Cupón ID ${coupon_id} asignado con éxito al usuario ID ${user_id}. Los cupones anteriores han sido inhabilitados.`
         });
 
     } catch (error) {
-        console.error("❌ Error al asignar cupón:", error);
+        // En caso de cualquier error, hacer Rollback
+        if (connection) {
+            await connection.rollback();
+        }
+        console.error("❌ Error en la transacción de asignación/desactivación:", error);
+
         let errorMessage = "Error interno del servidor al asignar el cupón.";
         if (error.sqlMessage) {
-            errorMessage = `Error de Base de Datos: ${error.sqlMessage}. Revise si el ID de usuario existe.`;
+            errorMessage = `Error de Base de Datos: ${error.sqlMessage}. Revise si el ID de usuario existe o el cupón tiene un problema.`;
         }
 
         return res.status(500).json({
             success: false,
             message: errorMessage
         });
+    } finally {
+        // Liberar la conexión
+        if (connection) {
+            connection.release();
+        }
     }
 };
-
-
 /**
  * Habilita o inhabilita un cupón específico (Instancia).
  * @route POST /api/admin/coupon/toggle-inhabilitado
