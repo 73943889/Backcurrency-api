@@ -414,13 +414,24 @@ exports.toggleCouponInhabilitado = async (req, res) => {
 // =========================================================
 
 /**
- * Obtiene todos los cupones de la base de datos para el panel de administración.
- * @route GET /api/admin/coupons
+ * Obtiene los cupones de la base de datos CON PAGINACIÓN para el panel de administración.
+ * @route GET /api/admin/coupons?limit=10&offset=0
  */
 exports.getAllCoupons = async (req, res) => {
     try {
-        // Consulta SQL con LEFT JOIN para obtener el email del usuario asignado
-        const sql = `
+        // 1. Obtener y validar parámetros de paginación desde la URL (query)
+        // El frontend envía 'limit' y 'offset'. Usamos parseInt para asegurarnos.
+        const limit = parseInt(req.query.limit) || 10;
+        const offset = parseInt(req.query.offset) || 0;
+        
+        // 2. Consulta A: Obtener el TOTAL de registros (CLAVE para calcular las 'N' páginas)
+        // Se hace en una consulta separada para mayor eficiencia, sin aplicar limit/offset.
+        const countSql = `SELECT COUNT(c.id) AS total FROM cupones c`;
+        const [countResult] = await db.execute(countSql);
+        const totalRecords = countResult[0].total; // Total de cupones en la BD
+
+        // 3. Consulta B: Obtener los cupones para la página actual (con paginación)
+        const couponsSql = `
             SELECT 
                 c.*, 
                 u.email AS user_email
@@ -430,15 +441,21 @@ exports.getAllCoupons = async (req, res) => {
                 users u ON c.user_id = u.id
             ORDER BY 
                 c.id DESC
+            LIMIT ? OFFSET ?  -- APLICAMOS LOS PARÁMETROS DE PAGINACIÓN
         `;
-        const [coupons] = await db.execute(sql);
+        
+        // Ejecutamos la consulta con los valores de limit y offset
+        const [coupons] = await db.execute(couponsSql, [limit, offset]);
 
+        // 4. Devolver la respuesta con el total de registros y los cupones de la página
         return res.json({
             success: true,
-            coupons: coupons
+            total: totalRecords, // ¡El frontend necesita este valor!
+            coupons: coupons     // Los 10 cupones de la página actual
         });
+        
     } catch (error) {
-        console.error("❌ Error al obtener cupones:", error);
+        console.error("❌ Error al obtener cupones (con paginación):", error);
         return res.status(500).json({
             success: false,
             message: "Error interno del servidor al obtener la lista de cupones."
