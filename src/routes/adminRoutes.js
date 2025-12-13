@@ -31,4 +31,8 @@ router.post('/coupon-config/update', authAdmin, CouponController.updateCouponCon
 router.post('/coupon-config/toggle', authAdmin, CouponController.toggleRuleStatus); // (Para activar/desactivar y asegurar exclusividad)
 router.post('/coupon/assign', authAdmin, CouponController.assignCouponToUser);
 router.post('/coupon/toggle-inhabilitado', authAdmin, CouponController.toggleCouponInhabilitado);
+router.post('/coupon/assign', authAdmin, CouponController.assignCouponToUser);
+router.post('/coupon/unassign', authAdmin, CouponController.unassignCoupon);
+router.get('/users', authAdmin, CouponController.getUsersForAssignment);
+
 module.exports = router;

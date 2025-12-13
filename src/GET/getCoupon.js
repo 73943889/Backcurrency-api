@@ -286,41 +286,41 @@ exports.toggleRuleStatus = async (req, res) => {
     }
 };
 
-
 /**
  * Asigna un cupón existente a un user_id específico.
  * @route POST /api/admin/coupon/assign
  */
 exports.assignCouponToUser = async (req, res) => {
     try {
-        const { couponId, userId } = req.body;
+        // 🚨 CAMBIO AQUÍ: Asegúrate de que los nombres coincidan con el frontend (script.js)
+        const { coupon_id, user_id } = req.body; // El frontend envía 'coupon_id' y 'user_id'
 
-        if (!couponId || !userId) {
+        if (!coupon_id || !user_id) {
             return res.status(400).json({ success: false, message: "ID de cupón y ID de usuario son obligatorios." });
         }
 
         // 1. Validar que el cupón exista
-        const [existing] = await db.execute('SELECT id, user_id FROM cupones WHERE id = ?', [couponId]);
+        const [existing] = await db.execute('SELECT id, user_id FROM cupones WHERE id = ?', [coupon_id]);
         if (existing.length === 0) {
             return res.status(404).json({ success: false, message: "Cupón no encontrado." });
         }
         
         // 2. Realizar la asignación
         const sql = `UPDATE cupones SET user_id = ? WHERE id = ?`;
-        const [result] = await db.execute(sql, [userId, couponId]);
+        const [result] = await db.execute(sql, [user_id, coupon_id]); // user_id se asigna al cupón
 
         if (result.affectedRows === 0) {
-            return res.status(500).json({ success: false, message: "Fallo al asignar el cupón (posiblemente ya estaba asignado a ese ID)." });
+            // Esto sucede si el cupón ya estaba asignado a ese user_id. Lo consideramos éxito.
+            return res.json({ success: true, message: `Cupón ID ${coupon_id} ya estaba asignado al usuario ID ${user_id}.` });
         }
 
         return res.json({
             success: true,
-            message: `Cupón ID ${couponId} asignado con éxito al usuario ID ${userId}.`
+            message: `Cupón ID ${coupon_id} asignado con éxito al usuario ID ${user_id}.`
         });
 
     } catch (error) {
         console.error("❌ Error al asignar cupón:", error);
-        // Error de SQL (ej. violación de FOREIGN KEY si el usuario no existe)
         let errorMessage = "Error interno del servidor al asignar el cupón.";
         if (error.sqlMessage) {
             errorMessage = `Error de Base de Datos: ${error.sqlMessage}. Revise si el ID de usuario existe.`;
@@ -406,6 +406,70 @@ exports.getAllCoupons = async (req, res) => {
         return res.status(500).json({
             success: false,
             message: "Error interno del servidor al obtener la lista de cupones."
+        });
+    }
+};
+
+/**
+ * Obtiene los usuarios de la base de datos para mostrarlos en el modal de asignación.
+ * @route GET /api/admin/users
+ */
+exports.getUsersForAssignment = async (req, res) => {
+    try {
+        // Obtenemos solo los campos necesarios y limitamos la cantidad
+        const sql = `
+            SELECT id, email, type, created_at 
+            FROM users 
+            ORDER BY created_at DESC 
+            LIMIT 500
+        `;
+        
+        const [users] = await db.execute(sql);
+
+        return res.json({
+            success: true,
+            users: users
+        });
+
+    } catch (error) {
+        console.error("❌ Error al listar usuarios para asignación:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno del servidor al listar usuarios."
+        });
+    }
+};
+
+/**
+ * Desasigna un cupón existente (establece user_id a NULL).
+ * @route POST /api/admin/coupon/unassign
+ */
+exports.unassignCoupon = async (req, res) => {
+    try {
+        const { id } = req.body; // id es el ID del cupón
+
+        if (!id) {
+            return res.status(400).json({ success: false, message: "ID del cupón es obligatorio." });
+        }
+
+        // Establecer user_id a NULL para desasignar
+        const sql = `UPDATE cupones SET user_id = NULL WHERE id = ?`;
+        const [result] = await db.execute(sql, [id]);
+
+        if (result.affectedRows === 0) {
+             return res.status(404).json({ success: false, message: "Cupón no encontrado o ya estaba desasignado." });
+        }
+
+        return res.json({
+            success: true,
+            message: `Cupón ID ${id} desasignado exitosamente.`
+        });
+
+    } catch (error) {
+        console.error("❌ Error al desasignar cupón:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Error interno del servidor al desasignar cupón."
         });
     }
 };
