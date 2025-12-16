@@ -138,7 +138,7 @@ const registerTransferHandler = async (req, res) => {
     }
 
     // 3. 📝 Insertar transferencia (Consulta de una sola línea, mantenida para evitar error 1064)
-    const insertQuery = "INSERT INTO transferencias (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    const insertQuery = "INSERT INTO transfers (user_id, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobante_url, cupon, moneda) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     
     await connection.query(insertQuery, [
       userIdInt, nombre, dni, cuenta, banco, email, monto, cod_aprobacion, comprobanteUrl, cupon, moneda

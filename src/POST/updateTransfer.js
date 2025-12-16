@@ -12,7 +12,7 @@ const updateStatusHandler = async (req, res) => {
 
     try {
         // La consulta SQL actualiza la columna 'estado'
-        await db.query(`UPDATE transferencias SET estado = ? WHERE id = ?`, 
+        await db.query(`UPDATE transfers SET estado = ? WHERE id = ?`, 
                         [nuevoEstado, transferId]);
         
         // Log de Auditoría para saber quién y cuándo hizo el cambio

@@ -14,10 +14,10 @@ const getAllTransfersHandler = async (req, res) => {
                 t.banco,
                 t.comprobante_url,     -- URL del comprobante
                 t.cod_aprobacion,      -- Código de aprobación
-                t.fecha,               -- 💡 CORRECCIÓN: Usamos 'fecha' en lugar de 'fecha_registro'
-                t.estado,              -- 💡 AHORA EXISTE: Usamos la nueva columna 'estado'
+                t.fecha,                
+                t.estado,              
                 u.email AS user_email  -- Email del usuario (desde la tabla users)
-             FROM transferencias t
+             FROM transfers t
              JOIN users u ON t.user_id = u.id 
              ORDER BY t.fecha DESC`
         );
