@@ -2,10 +2,9 @@
 const express = require('express');
 const router = express.Router();
 
-// Importamos la función lógica
-const getVerifyUser = require('../GET/getVerifyUser');
+// Verifica que la carpeta sea GET y el archivo getVerifyUser exactamente
+const getVerifyUser = require('../GET/getVerifyUsers'); 
 
-// Definimos la ruta correctamente con el parámetro :id
 router.get('/verify-user/:id', getVerifyUser);
 
 module.exports = router;
