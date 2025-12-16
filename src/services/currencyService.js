@@ -1,4 +1,4 @@
-const axios = require('axios');
+/*const axios = require('axios');
 const db = require('../db');
 require('dotenv').config();
 
@@ -23,4 +23,4 @@ async function convertCurrency(from, to, amount) {
 
 }
 
-module.exports = { convertCurrency };
+module.exports = { convertCurrency };*/

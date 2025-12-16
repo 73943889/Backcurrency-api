@@ -1,4 +1,4 @@
-const pool = require('../db');
+/*const pool = require('../db');
 
 const registerTransfer = async (req, res) => {
   console.log("Transferencia recibida:", req.body);
@@ -47,4 +47,4 @@ const registerTransfer = async (req, res) => {
   }
 };
 
-module.exports = registerTransfer;
+module.exports = registerTransfer;*/

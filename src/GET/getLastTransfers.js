@@ -8,7 +8,7 @@ router.get('/user/:id', async (req, res) => {
 
     try {
         const [result] = await pool.query(
-            'SELECT * FROM transferencias WHERE user_id = ? ORDER BY fecha DESC LIMIT 10',
+            'SELECT * FROM transfers WHERE user_id = ? ORDER BY fecha DESC LIMIT 10',
             [userId]
         );
 
