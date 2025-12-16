@@ -18,6 +18,7 @@ const validateCuponRoute = require('./src/routes/validateCuponRoutes');
 const cuponRoutes = require('./src/routes/cuponRoutes');
 const exchangeRatesRoutes = require('./src/routes/exchangeRatesRoutes');
 const adminRoutes = require('./src/routes/adminRoutes');
+const verifyUser= require('./src/routes/verifyuserRoutes');
 const app = express();
 
 app.use(cors({
@@ -40,6 +41,7 @@ app.use('/api/cupones', validateCuponRoute);
 app.use('/api/cupon', cuponRoutes);
 app.use('/api/exchange', exchangeRatesRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api', verifyUser);
 //const PORT = process.env.PORT || 5037;
 const PORT = 3000;
 
