@@ -1,20 +1,19 @@
 const pool = require('../db'); 
 
-// Exportamos solo la función, no un router nuevo
-const verifyUser = async (req, res) => {
+const getVerifyUser = async (req, res) => {
     const { id } = req.params;
     try {
-        // Corregido: Usar 'pool' o 'db' según como lo hayas importado arriba
+        // Asegúrate de usar 'pool' que es lo que importaste arriba
         const [rows] = await pool.query('SELECT id FROM users WHERE id = ?', [id]);
         
         if (rows.length > 0) {
-            return res.json({ success: true, message: "Usuario válido" });
+            res.json({ success: true, message: "Usuario válido" });
         } else {
-            return res.status(404).json({ success: false, message: "Usuario no existe" });
+            res.status(404).json({ success: false, message: "Usuario no existe" });
         }
     } catch (error) {
-        return res.status(500).json({ success: false, error: error.message });
+        res.status(500).json({ success: false, error: error.message });
     }
 };
 
-module.exports = verifyUser;
+module.exports = getVerifyUser;
